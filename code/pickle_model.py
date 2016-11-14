@@ -11,18 +11,18 @@ y = df.pop('top_school_final')
 df_train, df_valid, y_train, y_valid = train_test_split(df, y, train_size=0.7, random_state=123)
 
 pipeline = Pipeline([
-    ('essay_p1', ms.CleanEssays()),
-    ('essay_p2', ms.AnalyzeEssays()),
-    # ('sports', ms.Sports()),
-    # ('SAT', ms.CleanSAT()),
-    # ('GPA', ms.CleanGPA()),
-    # ('gender', ms.Gender()),
-    # ('ethnicity', ms.Ethnicity()),
-    # ('extracc', ms.ExtraCurriculars()),
-    # ('homecountry', ms.HomeCountry()),
-    # ('dummify', ms.DummifyCategoricals()),
-    # ('final', ms.FinalColumns()),
-    # ('scale', ms.StandardScaler()),
+    ('SAT', CleanSAT()),
+    ('GPA', CleanGPA()),
+    ('gender', Gender()),
+    ('ethnicity', Ethnicity()),
+    ('extracc', ExtraCurriculars()),
+    ('homecountry', HomeCountry()),
+    ('sports', Sports()),
+    ('dummify', DummifyCategoricals()),
+    ('essay_p1', CleanEssays()),
+    ('essay_p2', AnalyzeEssays()),
+    ('final', FinalColumns()),
+    ('scale', StandardScaler()),
     ('model', RandomForestClassifier(n_estimators=10, min_samples_leaf=4,min_samples_split=2))
 ])
 

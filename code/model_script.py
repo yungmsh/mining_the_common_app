@@ -27,197 +27,6 @@ class CustomMixin(TransformerMixin):
             setattr(self, key, kwargs[key])
         return self
 
-class CleanEssays(CustomMixin):
-    def fit(self, X, y):
-        return self
-
-    def transform(self, X):
-        self.updateEssayCols(X)
-        self.updateWordCounts(X)
-        X['essay_c3_edit'] = X['essay_c3'].apply(lambda x: self.cleanEssayC3(x) if not x is np.nan else x)
-        for old,new in zip(['essay_c1', 'essay_c2'], ['essay_c1_edit', 'essay_c2_edit']):
-            X[new] = X.apply(lambda x: x[old] if x['Undergraduate Personal Statement Type'] == 'Full Length Personal Statement' else np.nan, axis=1)
-        self.new_cols = [col+'_edit' for col in self.cols]
-        self.removeASCII(X)
-        self.removeExtremes(X)
-        self.removeOverlaps(X)
-        X['essay_final'] = X.apply(self.consolidateEssays, axis=1)
-        return X
-
-    def updateEssayCols(self, X):
-        '''
-        INPUT: X (DataFrame)
-        OUTPUT: None
-
-        Updates the three essay columns to a simpler form, then drops the old columns.
-        '''
-        old_cols = ['Undergraduate Personal Statement', 'Undergraduate Essay Details', 'NEW Personal Statement']
-        self.cols = ['essay_c'+str(i+1) for i,v in enumerate(old_cols)]
-        for old,new in zip(old_cols,self.cols):
-            X[new] = X[old].copy()
-
-    def updateWordCounts(self, X):
-        '''
-        INPUT: X (DataFrame)
-        OUTPUT: None
-
-        Creates/Updates columns that show the word count for the three essay columns.
-        '''
-        self.wordcnt_cols = ['wordcnt_'+col for col in self.cols]
-        for wordcnt_col, col in zip(self.wordcnt_cols, self.cols):
-            X[wordcnt_col] = X[col].apply(lambda x: len(x.split()) if not x is np.nan and not x == None else x)
-
-    def cleanEssayC3(self, essay):
-        '''
-        INPUT: essay (string)
-        OUTPUT: cleaned essay (string)
-
-        Receives an unformatted chunk of text, and extracts just the essay part.
-        '''
-        content = re.findall('Full Length Personal Statement([\s\S]*)', essay)
-        if len(content)>0:
-            cleaned = content[0].strip()
-            brackets = re.findall('[[]\d+[]]', cleaned)
-            if len(brackets)>0:
-                pos = cleaned.find(brackets[0])
-                return cleaned[:pos].strip()
-        else:
-            return np.nan
-
-    def removeASCII(self, X):
-        '''
-        INPUT: X (DataFrame), cols (list)
-        OUTPUT: None
-
-        Given a dataframe and list of essay cols, this function removes ASCII characters in each entry in each col.
-        '''
-        for col in self.cols:
-            X[col] = X[col].apply(lambda x: self._ASCII(x) if not x is np.nan and not x is None else x)
-
-    def _ASCII(self, essay):
-        '''
-        Internal function for removeASCII function above
-        '''
-        # for exp in set(re.findall('\xe2\W*', essay)):
-        for exp in set(re.findall('[^\w\s\d,.-]+', essay)):
-            essay = essay.replace(exp, '')
-        return essay
-
-    def removeExtremes(self, X):
-        '''
-        INPUT: df (DataFrame), cols (list)
-        OUTPUT: None
-        '''
-        for col in self.new_cols:
-            X[col] = X[col].apply(lambda x: x if not x is np.nan and not x is None and len(x.split())>200 and len(x.split())<1100 else np.nan)
-
-    def removeOverlaps(self, X):
-        '''
-        INPUT: df (DataFrame), cols (list of cols), keep_col (string)
-        OUTPUT: None
-        '''
-        remove_col = 'essay_c2_edit'
-        idx = []
-        for col in self.new_cols:
-            idx.append(X[X[col].notnull()==True].index)
-        intersect = np.intersect1d(idx[0],idx[1])
-        X.ix[intersect, remove_col] = np.nan
-
-    def consolidateEssays(self, X):
-        '''
-        INPUT: df (DataFrame), cols (list of cols to consolidate)
-        OUTPUT: essay text (string) or np.nan
-        '''
-        c1,c2,c3 = self.new_cols
-        if type(X[c1])==str:
-            return X[c1]
-        elif type(X[c2])==str:
-            return X[c2]
-        elif type(X[c3])==str:
-            return X[c3]
-        else:
-            return np.nan
-
-class AnalyzeEssays(CustomMixin):
-    def fit(self, X, y):
-        # Preprocess: remove stopwords and perform stemming
-        essays = self.preprocess(X, 'fit')
-        print 'Finished preprocessing essays'
-
-        # Vectorize using tfidf
-        self.vec = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=2, max_features=10000)
-        self.vec.fit(essays)
-        mat = self.vec.transform(essays)
-        print 'Finished vectorizing (fit and transform) on train set'
-
-        # Use NMF to perform topic modeling
-        self.nmf = NMF(n_components=7, random_state=123)
-        self.nmf.fit(mat)
-        mat_nmf = self.nmf.transform(mat)
-        print 'Finished NMF fit_transform on train set'
-        self.essay_topics = ['essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
-        df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
-        # Calculate 'avg' values of topics (to impute missing essays later)
-        self.avg_topics = df_nmf.mean().values
-
-        # Merge mat_nmf to main dataframe X
-        X = X.join(df_nmf)
-        print 'Finished merging mat_nmf to main dataframe'
-        return self
-
-    def transform(self, X):
-        essays, null_idx_v1 = self.preprocess(X, 'transform')
-        mat = self.vec.transform(essays)
-        mat_nmf = self.nmf.transform(mat)
-        print "len(null_idx_v1) is", str(len(null_idx_v1))
-        print "mat_nmf's shape is", str(mat_nmf.shape)
-        print 'first row of mat_nmf\n', mat_nmf[0]
-        df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
-
-        # FIND MISSING ROW INDICES, THEN IMPUTE WITH self.avg_topics
-        null_idx_v2 = df_nmf.isnull().any(axis=1).index
-        print "len(null_idx_v2) is", str(len(null_idx_v2))
-        print 'self.avg_topics is', self.avg_topics
-        df_nmf.loc[null_idx_v2,:] = self.avg_topics
-
-        print 'no of nulls in df_nmf:', len(df_nmf.isnull().any(axis=1))
-        X = X.join(df_nmf)
-        return X
-
-    def preprocess(self, X, fit_or_transform):
-        # If fitting, just use non-null values
-        if fit_or_transform == 'fit':
-            essays = X[X['essay_final'].notnull()]['essay_final'].values
-        # If transforming, include the nulls and keep a log of those indices
-        elif fit_or_transform == 'transform':
-            essays = X['essay_final'].values
-            null_idx = []
-
-        # Remove stop words, then stem
-        stop_words = stopwords.words('english')
-        stemmer = PorterStemmer()
-        for i,essay in enumerate(essays):
-            if not essay is np.nan and not essay is None and not essay == '':
-                essay = re.sub('\xe2\W+', '', essay)
-                essay = ' '.join([word for word in essay.split() if word not in stop_words])
-                stemmed = []
-                for word in essay.split():
-                    try:
-                        stemmed.append(stemmer.stem(word))
-                    except UnicodeDecodeError:
-                        pass
-                essays[i] = ' '.join(stemmed)
-            else:
-                # If essay is null, set it to empty string, log the index
-                essays[i] = ''
-                if fit_or_transform == 'transform':
-                    null_idx.append(i)
-
-        if fit_or_transform == 'fit':
-            return essays
-        if fit_or_transform == 'transform':
-            return essays, null_idx
-
 class CleanSAT(CustomMixin):
     def fit(self, X, y):
         self.median_score = X[(X['Highest Composite SAT Score']<=2400) & (X['Highest Composite SAT Score']>=600)]['High School GPA'].median()
@@ -414,7 +223,6 @@ class Sports(CustomMixin):
         # Create a varsity dummy variable.
         X['sportsCaptain'] = X['High School Sports Played'].apply(lambda x: eda.parseCaptain(x, self.unique_sports))
 
-        print ">>> DONE <<<"
         return X
 
 class DummifyCategoricals(CustomMixin):
@@ -425,25 +233,216 @@ class DummifyCategoricals(CustomMixin):
         X = pd.get_dummies(X, columns=['Academic Performance in High School'], prefix='HS')
         return X
 
+class CleanEssays(CustomMixin):
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X):
+        self.updateEssayCols(X)
+        self.updateWordCounts(X)
+        X['essay_c3_edit'] = X['essay_c3'].apply(lambda x: self.cleanEssayC3(x) if not x is np.nan else x)
+        for old,new in zip(['essay_c1', 'essay_c2'], ['essay_c1_edit', 'essay_c2_edit']):
+            X[new] = X.apply(lambda x: x[old] if x['Undergraduate Personal Statement Type'] == 'Full Length Personal Statement' else np.nan, axis=1)
+        self.new_cols = [col+'_edit' for col in self.cols]
+        self.removeASCII(X)
+        self.removeExtremes(X)
+        self.removeOverlaps(X)
+        X['essay_final'] = X.apply(self.consolidateEssays, axis=1)
+        return X
+
+    def updateEssayCols(self, X):
+        '''
+        INPUT: X (DataFrame)
+        OUTPUT: None
+
+        Updates the three essay columns to a simpler form, then drops the old columns.
+        '''
+        old_cols = ['Undergraduate Personal Statement', 'Undergraduate Essay Details', 'NEW Personal Statement']
+        self.cols = ['essay_c'+str(i+1) for i,v in enumerate(old_cols)]
+        for old,new in zip(old_cols,self.cols):
+            X[new] = X[old].copy()
+
+    def updateWordCounts(self, X):
+        '''
+        INPUT: X (DataFrame)
+        OUTPUT: None
+
+        Creates/Updates columns that show the word count for the three essay columns.
+        '''
+        self.wordcnt_cols = ['wordcnt_'+col for col in self.cols]
+        for wordcnt_col, col in zip(self.wordcnt_cols, self.cols):
+            X[wordcnt_col] = X[col].apply(lambda x: len(x.split()) if not x is np.nan and not x == None else x)
+
+    def cleanEssayC3(self, essay):
+        '''
+        INPUT: essay (string)
+        OUTPUT: cleaned essay (string)
+
+        Receives an unformatted chunk of text, and extracts just the essay part.
+        '''
+        content = re.findall('Full Length Personal Statement([\s\S]*)', essay)
+        if len(content)>0:
+            cleaned = content[0].strip()
+            brackets = re.findall('[[]\d+[]]', cleaned)
+            if len(brackets)>0:
+                pos = cleaned.find(brackets[0])
+                return cleaned[:pos].strip()
+        else:
+            return np.nan
+
+    def removeASCII(self, X):
+        '''
+        INPUT: X (DataFrame), cols (list)
+        OUTPUT: None
+
+        Given a dataframe and list of essay cols, this function removes ASCII characters in each entry in each col.
+        '''
+        for col in self.cols:
+            X[col] = X[col].apply(lambda x: self._ASCII(x) if not x is np.nan and not x is None else x)
+
+    def _ASCII(self, essay):
+        '''
+        Internal function for removeASCII function above
+        '''
+        # for exp in set(re.findall('\xe2\W*', essay)):
+        for exp in set(re.findall('[^\w\s\d,.-]+', essay)):
+            essay = essay.replace(exp, '')
+        return essay
+
+    def removeExtremes(self, X):
+        '''
+        INPUT: df (DataFrame), cols (list)
+        OUTPUT: None
+        '''
+        for col in self.new_cols:
+            X[col] = X[col].apply(lambda x: x if not x is np.nan and not x is None and len(x.split())>200 and len(x.split())<1100 else np.nan)
+
+    def removeOverlaps(self, X):
+        '''
+        INPUT: df (DataFrame), cols (list of cols), keep_col (string)
+        OUTPUT: None
+        '''
+        remove_col = 'essay_c2_edit'
+        idx = []
+        for col in self.new_cols:
+            idx.append(X[X[col].notnull()==True].index)
+        intersect = np.intersect1d(idx[0],idx[1])
+        X.loc[intersect, remove_col] = np.nan
+
+    def consolidateEssays(self, X):
+        '''
+        INPUT: df (DataFrame), cols (list of cols to consolidate)
+        OUTPUT: essay text (string) or np.nan
+        '''
+        c1,c2,c3 = self.new_cols
+        if type(X[c1])==str:
+            return X[c1]
+        elif type(X[c2])==str:
+            return X[c2]
+        elif type(X[c3])==str:
+            return X[c3]
+        else:
+            return np.nan
+
+class AnalyzeEssays(CustomMixin):
+    def fit(self, X, y):
+        # Preprocess: remove stopwords and perform stemming
+        essays = self.preprocess(X, 'fit')
+        print 'Finished preprocessing essays'
+
+        # Vectorize using tfidf
+        self.vec = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=2, max_features=10000)
+        self.vec.fit(essays)
+        mat = self.vec.transform(essays)
+        print 'Finished vectorizing (fit and transform) on train set'
+
+        # Use NMF to perform topic modeling
+        self.nmf = NMF(n_components=7, random_state=123)
+        self.nmf.fit(mat)
+        mat_nmf = self.nmf.transform(mat)
+        print 'Finished NMF fit_transform on train set'
+        self.essay_topics = ['essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
+        df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
+        # Calculate 'avg' values of topics (to impute missing essays later)
+        self.avg_topics = df_nmf.mean().values
+
+        # Merge mat_nmf to main dataframe X
+        X = X.join(df_nmf)
+        print 'Finished merging mat_nmf to main dataframe'
+        return self
+
+    def transform(self, X):
+        essays, null_idx_v1 = self.preprocess(X, 'transform')
+        mat = self.vec.transform(essays)
+        mat_nmf = self.nmf.transform(mat)
+        print "len(null_idx_v1) is", str(len(null_idx_v1))
+        print "mat_nmf's shape is", str(mat_nmf.shape)
+        print 'first row of mat_nmf\n', mat_nmf[0]
+        df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
+
+        # FIND MISSING ROW INDICES, THEN IMPUTE WITH self.avg_topics
+        null_idx_v2 = df_nmf.isnull().any(axis=1).index
+        print "len(null_idx_v2) is", str(len(null_idx_v2))
+        print 'self.avg_topics is', self.avg_topics
+        df_nmf.loc[null_idx_v2,] = self.avg_topics
+
+        print 'no of nulls in df_nmf:', len(df_nmf.isnull().any(axis=1))
+        X = X.join(df_nmf)
+        return X
+
+    def preprocess(self, X, fit_or_transform):
+        # If fitting, just use non-null values
+        if fit_or_transform == 'fit':
+            essays = X[X['essay_final'].notnull()]['essay_final'].values
+        # If transforming, include the nulls and keep a log of those indices
+        elif fit_or_transform == 'transform':
+            essays = X['essay_final'].values
+            null_idx = []
+
+        # Remove stop words, then stem
+        stop_words = stopwords.words('english')
+        stemmer = PorterStemmer()
+        for i,essay in enumerate(essays):
+            if not essay is np.nan and not essay is None and not essay == '':
+                essay = re.sub('\xe2\W+', '', essay)
+                essay = ' '.join([word for word in essay.split() if word not in stop_words])
+                stemmed = []
+                for word in essay.split():
+                    try:
+                        stemmed.append(stemmer.stem(word))
+                    except UnicodeDecodeError:
+                        pass
+                essays[i] = ' '.join(stemmed)
+            else:
+                # If essay is null, set it to empty string, log the index
+                essays[i] = ''
+                if fit_or_transform == 'transform':
+                    null_idx.append(i)
+
+        if fit_or_transform == 'fit':
+            return essays
+        if fit_or_transform == 'transform':
+            return essays, null_idx
+
 class FinalColumns(CustomMixin):
     def fit(self, X, y):
         return self
 
     def transform(self, X):
-        # final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US']
-        #
-        # ethnicity_cols = [col for col in X.columns if col.find('Ethnicity_')>-1]
-        # HS_perf_cols = [col for col in X.columns if col.find('HS_')>-1]
-        # sports_cols = [col for col in X.columns if col.find('sports_')>-1]
-        # sports_cols.extend(['sportsVarsity', 'sportsCaptain'])
-        #
-        # final_cols.extend(ethnicity_cols)
-        # final_cols.extend(HS_perf_cols)
-        # final_cols.extend(sports_cols)
+        final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US']
 
-        essay_cols = ['essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
+        ethnicity_cols = [col for col in X.columns if col.find('Ethnicity_')>-1]
+        HS_perf_cols = [col for col in X.columns if col.find('HS_')>-1]
+        sports_cols = [col for col in X.columns if col.find('sports_')>-1]
+        sports_cols.extend(['sportsVarsity', 'sportsCaptain'])
+        essay_cols = ['essay_topic'+str(i) for i in range(1,8)]
 
-        X_model = X[essay_cols].copy()
+        final_cols.extend(ethnicity_cols)
+        final_cols.extend(HS_perf_cols)
+        final_cols.extend(sports_cols)
+        final_cols.extend(essay_cols)
+
+        X_model = X[final_cols].copy()
         print 'Finished filtering final columns'
         print 'Printing the number of nulls in each col'
         print X_model.isnull().sum()
@@ -461,8 +460,6 @@ if __name__=='__main__':
     df_train, df_valid, y_train, y_valid = train_test_split(df, y, train_size=0.7, random_state=123)
 
     pipeline = Pipeline([
-        ('essay_p1', CleanEssays()),
-        ('essay_p2', AnalyzeEssays()),
         ('SAT', CleanSAT()),
         ('GPA', CleanGPA()),
         ('gender', Gender()),
@@ -471,6 +468,8 @@ if __name__=='__main__':
         ('homecountry', HomeCountry()),
         ('sports', Sports()),
         ('dummify', DummifyCategoricals()),
+        ('essay_p1', CleanEssays()),
+        ('essay_p2', AnalyzeEssays()),
         ('final', FinalColumns()),
         ('scale', StandardScaler()),
         ('model', RandomForestClassifier(n_estimators=10, min_samples_leaf=4,min_samples_split=2))

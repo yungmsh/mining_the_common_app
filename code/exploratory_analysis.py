@@ -129,18 +129,9 @@ def parseSports(df, unique_sports):
     '''
     Fills in the dummy variables for each sport category.
     '''
-    print 'df index is', df.index
-    # df.reset_index(inplace=True)
     # print 'df index is', df.index
-    # print ">>>"
-    # print type(df)
-    # #print df
-    # print "<<<"
-    for fake_i,i in enumerate(df.index):
+    for i in df.index:
         raw_data = df.loc[i,'High School Sports Played']
-        # print 'i =', i
-        # print 'raw_data =', raw_data
-        print fake_i
         if not raw_data is np.nan:
             for sport in unique_sports:
                 if sport in raw_data:
