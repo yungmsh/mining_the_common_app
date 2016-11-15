@@ -238,7 +238,7 @@ class AnalyzeEssays(object):
         arr_mod = arr[:,keep_idx]
         return arr_mod
 
-class dimReduction(object):
+class DimReduction(object):
     def __init__(self):
         pass
 

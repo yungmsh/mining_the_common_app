@@ -29,7 +29,7 @@ class CustomMixin(TransformerMixin):
 
 class CleanSAT(CustomMixin):
     def fit(self, X, y):
-        self.median_score = X[(X['Highest Composite SAT Score']<=2400) & (X['Highest Composite SAT Score']>=600)]['High School GPA'].median()
+        self.median_score = X[(X['Highest Composite SAT Score']<=2400) & (X['Highest Composite SAT Score']>=600)]['Highest Composite SAT Score'].median()
         self.median_times = X['How many times did you take the official SAT?'].median()
         return self
 
@@ -439,7 +439,10 @@ class FinalColumns(CustomMixin):
         final_cols.extend(sports_cols)
         final_cols.extend(essay_cols)
 
-        X_model = X[final_cols].copy()
+        good_cols = ['Ethnicity_Asian', 'Ethnicity_Black', 'Ethnicity_Hispanic', 'Ethnicity_White', 'HS_Low at first but improved',
+        'HS_Low one semester/year', 'HS_Some good some bad', 'HS_Steady', 'High School GPA', 'Home Country_US', 'Male', 'SAT_times_taken', 'SAT_total_final', 'academic', 'arts', 'award', 'gov', 'leader', 'sportsCaptain', 'sportsVarsity', 'sports_Basketball', 'sports_Cheer/Spirit Squad', 'sports_Fencing', 'sports_Lacrosse', 'sports_Martial Arts', 'sports_Mountain Biking/Cycling', 'sports_Rowing', 'sports_Skiing', 'sports_Soccer', 'sports_Tennis', 'sports_Track &amp; Field', 'sports_Wrestling']
+
+        X_model = X[good_cols].copy()
         print 'Finished filtering final columns'
         print 'Printing the number of nulls in each col'
         print X_model.isnull().sum()
