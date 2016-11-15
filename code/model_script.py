@@ -363,31 +363,34 @@ class AnalyzeEssays(CustomMixin):
         print 'Finished NMF fit_transform on train set'
         self.essay_topics = ['essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
+
         # Calculate 'avg' values of topics (to impute missing essays later)
         self.avg_topics = df_nmf.mean().values
+        print 'self.avg_topics is', self.avg_topics
 
-        # Merge mat_nmf to main dataframe X
-        X = X.join(df_nmf)
-        print 'Finished merging mat_nmf to main dataframe'
         return self
 
     def transform(self, X):
-        essays, null_idx_v1 = self.preprocess(X, 'transform')
+        essays = self.preprocess(X, 'transform')
         mat = self.vec.transform(essays)
         mat_nmf = self.nmf.transform(mat)
-        print "len(null_idx_v1) is", str(len(null_idx_v1))
-        print "mat_nmf's shape is", str(mat_nmf.shape)
-        print 'first row of mat_nmf\n', mat_nmf[0]
+
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
+        # zeros = (df_nmf==0).all(axis=1)
+        # zeros_idx = zeros[zeros==True].index
+        # print "len(zeros_idx) is", str(len(zeros_idx))
+        # df_nmf.loc[zeros_idx,] = self.avg_topics
+        # print "no of null rows in df_nmf", str(sum(df_nmf.isnull().any(axis=1)))
 
-        # FIND MISSING ROW INDICES, THEN IMPUTE WITH self.avg_topics
-        null_idx_v2 = df_nmf.isnull().any(axis=1).index
-        print "len(null_idx_v2) is", str(len(null_idx_v2))
-        print 'self.avg_topics is', self.avg_topics
-        df_nmf.loc[null_idx_v2,] = self.avg_topics
+        # nulls = df_nmf.isnull().any(axis=1)
+        # nulls_idx = nulls[nulls==True].index
+        # print "nulls_idx is", nulls_idx'
 
-        print 'no of nulls in df_nmf:', len(df_nmf.isnull().any(axis=1))
         X = X.join(df_nmf)
+        # Impute missing values with 'avg' value for each topic
+        for col,value in zip(self.essay_topics, self.avg_topics):
+            X[col].fillna(value=value, inplace=True)
+        print 'Finished merging mat_nmf to main dataframe'
         return X
 
     def preprocess(self, X, fit_or_transform):
@@ -397,13 +400,12 @@ class AnalyzeEssays(CustomMixin):
         # If transforming, include the nulls and keep a log of those indices
         elif fit_or_transform == 'transform':
             essays = X['essay_final'].values
-            null_idx = []
 
         # Remove stop words, then stem
         stop_words = stopwords.words('english')
         stemmer = PorterStemmer()
         for i,essay in enumerate(essays):
-            if not essay is np.nan and not essay is None and not essay == '':
+            if not essay in (np.nan, None, ''):
                 essay = re.sub('\xe2\W+', '', essay)
                 essay = ' '.join([word for word in essay.split() if word not in stop_words])
                 stemmed = []
@@ -414,15 +416,10 @@ class AnalyzeEssays(CustomMixin):
                         pass
                 essays[i] = ' '.join(stemmed)
             else:
-                # If essay is null, set it to empty string, log the index
+                # If essay is null, set it to empty string
                 essays[i] = ''
-                if fit_or_transform == 'transform':
-                    null_idx.append(i)
 
-        if fit_or_transform == 'fit':
-            return essays
-        if fit_or_transform == 'transform':
-            return essays, null_idx
+        return essays
 
 class FinalColumns(CustomMixin):
     def fit(self, X, y):
