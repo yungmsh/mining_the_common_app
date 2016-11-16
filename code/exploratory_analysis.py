@@ -141,16 +141,21 @@ def parseVarsity(x, unique_sports):
     '''
     Parses through sports text to determine whether someone participated in a varsity sport.
     '''
+    regexp = re.compile('[[]\S+[]]\s[[]\S+[]]\s(.+)')
     if not x in (None, np.nan):
-        data = re.findall('[[]\S+[]]\s[[]\S+[]]\s(.+)', x)
-        for i,d in enumerate(data):
-            if d in unique_sports and i+2<len(data):
-                if data[i+2] == 'Yes':
-                    return 1
-                else:
-                    return 0
-            else:
-                return 0
+        data = regexp.findall(x)
+        if data[2] == 'Yes':
+            return 1
+        else:
+            return 0
+        # for i,d in enumerate(data):
+        #     if d in unique_sports and i+2<len(data):
+        #         if data[i+2] == 'Yes':
+        #             return 1
+        #         else:
+        #             return 0
+        #     else:
+        #         return 0
     else:
         return 0
 
@@ -158,16 +163,21 @@ def parseCaptain(x, unique_sports):
     '''
     Parses through sports text to determine whether someone was a captain of a sport.
     '''
+    regexp = re.compile('[[]\S+[]]\s[[]\S+[]]\s(.+)')
     if not x in (None, np.nan):
-        data = re.findall('[[]\S+[]]\s[[]\S+[]]\s(.+)', x)
-        for i,d in enumerate(data):
-            if d in unique_sports and i+3<len(data):
-                if data[i+3] == 'Yes':
-                    return 1
-                else:
-                    return 0
-            else:
-                return 0
+        data = regexp.findall(x)
+        if data[2] == 'Yes':
+            return 1
+        else:
+            return 0
+        # for i,d in enumerate(data):
+        #     if d in unique_sports and i+3<len(data):
+        #         if data[i+3] == 'Yes':
+        #             return 1
+        #         else:
+        #             return 0
+        #     else:
+        #         return 0
     else:
         return 0
 

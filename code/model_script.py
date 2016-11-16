@@ -1,20 +1,22 @@
 import numpy as np
 import pandas as pd
-import re
 from sklearn.base import TransformerMixin
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import StandardScaler
 from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
+from nltk.stem import PorterStemmer, SnowballStemmer, WordNetLemmatizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import NMF, LatentDirichletAllocation
 from sklearn.grid_search import GridSearchCV
-from sklearn.metrics import make_scorer, accuracy_score, precision_score, recall_score, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix
 from sklearn.cross_validation import train_test_split, KFold, StratifiedKFold
 from collections import Counter, OrderedDict
+import re
 import time
+import string
+import en
 import cPickle as pickle
 import exploratory_analysis as eda
 
@@ -94,12 +96,12 @@ class CleanSAT(CustomMixin):
 
 class CleanGPA(CustomMixin):
     def fit(self, X, y):
-        self.median = X[X['High School GPA']<=4]['High School GPA'].median()
+        self.median = X[(X['High School GPA']<=4) & (X['High School GPA']>2) ]['High School GPA'].median()
         return self
 
     def transform(self, X):
         X['High School GPA'] = X['High School GPA'].apply(lambda x: np.nan if x>100 or x<=2 else x)
-        # X['High School GPA'] = X['High School GPA'].apply(lambda x: self.median if x>4 else x)
+        X['High School GPA'] = X['High School GPA'].apply(lambda x: self.median if x>4 else x)
         self.impute(X)
         return X
 
@@ -217,7 +219,9 @@ class Sports(CustomMixin):
         for sport in self.unique_sports:
             X['sports_'+sport] = 0
         # Fill in the dummy variables for each sport category (1 or 0).
-        eda.parseSports(X, self.unique_sports)
+        # eda.parseSports(X, self.unique_sports)
+        useful_sports = ['Tennis','Soccer','Track &amp; Field','Fencing','Lacrosse','Rowing','Cheer/Spirit Squad','Basketball']
+        eda.parseSports(X, useful_sports)
         # Create a varsity dummy variable.
         X['sportsVarsity'] = X['High School Sports Played'].apply(lambda x: eda.parseVarsity(x, self.unique_sports))
         # Create a varsity dummy variable.
@@ -346,6 +350,8 @@ class CleanEssays(CustomMixin):
 
 class AnalyzeEssays(CustomMixin):
     def fit(self, X, y):
+        # Get SAT words loaded first
+        self.getSATWords()
         # Preprocess: remove stopwords and perform stemming
         essays = self.preprocess(X, 'fit')
         print 'Finished preprocessing essays'
@@ -354,19 +360,23 @@ class AnalyzeEssays(CustomMixin):
         self.vec = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=2, max_features=10000)
         self.vec.fit(essays)
         mat = self.vec.transform(essays)
-        print 'Finished vectorizing (fit and transform) on train set'
+        print 'Finished vectorizing (fit and transform) on fit step'
 
         # Use NMF to perform topic modeling
         self.nmf = NMF(n_components=7, random_state=123)
         self.nmf.fit(mat)
         mat_nmf = self.nmf.transform(mat)
-        print 'Finished NMF fit_transform on train set'
+        print 'Finished NMF fit_transform on fit step'
         self.essay_topics = ['essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
 
         # Calculate 'avg' values of topics (to impute missing essays later)
         self.avg_topics = df_nmf.mean().values
         print 'self.avg_topics is', self.avg_topics
+
+        # Calculate mean of SAT word cols
+        self.words_1000_mean = X['1000_words_cnt'].mean()
+        self.words_5000_mean = X['5000_words_frac'].mean()
 
         return self
 
@@ -376,50 +386,67 @@ class AnalyzeEssays(CustomMixin):
         mat_nmf = self.nmf.transform(mat)
 
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
-        # zeros = (df_nmf==0).all(axis=1)
-        # zeros_idx = zeros[zeros==True].index
-        # print "len(zeros_idx) is", str(len(zeros_idx))
-        # df_nmf.loc[zeros_idx,] = self.avg_topics
-        # print "no of null rows in df_nmf", str(sum(df_nmf.isnull().any(axis=1)))
-
-        # nulls = df_nmf.isnull().any(axis=1)
-        # nulls_idx = nulls[nulls==True].index
-        # print "nulls_idx is", nulls_idx'
-
         X = X.join(df_nmf)
+
         # Impute missing values with 'avg' value for each topic
         for col,value in zip(self.essay_topics, self.avg_topics):
             X[col].fillna(value=value, inplace=True)
-        print 'Finished merging mat_nmf to main dataframe'
+
+        # Impute missing values for SAT word cols
+        X['1000_words_cnt'].fillna(value=self.words_1000_mean, inplace=True)
+        X['5000_words_frac'].fillna(value=self.words_5000_mean, inplace=True)
+
+        print 'Finished imputing essay features (topics AND fraction of SAT words)'
         return X
 
     def preprocess(self, X, fit_or_transform):
         # If fitting, just use non-null values
         if fit_or_transform == 'fit':
             essays = X[X['essay_final'].notnull()]['essay_final'].values
-        # If transforming, include the nulls and keep a log of those indices
+        # If transforming, use all values
         elif fit_or_transform == 'transform':
             essays = X['essay_final'].values
 
-        # Remove stop words, then stem
+        punct = string.punctuation
         stop_words = stopwords.words('english')
-        stemmer = PorterStemmer()
+        wn = WordNetLemmatizer()
+
         for i,essay in enumerate(essays):
             if not essay in (np.nan, None, ''):
-                essay = re.sub('\xe2\W+', '', essay)
-                essay = ' '.join([word for word in essay.split() if word not in stop_words])
-                stemmed = []
-                for word in essay.split():
+                essay = essay.decode('utf8')
+                # Correct tense and lemmatize
+                essay = essay.split()
+                for i,word in enumerate(essay):
                     try:
-                        stemmed.append(stemmer.stem(word))
-                    except UnicodeDecodeError:
+                        essay[i] = wn.lemmatize(en.verb.present(word.split(punct)))
+                    except:
                         pass
-                essays[i] = ' '.join(stemmed)
+                # Extract data for SAT words
+                c = Counter(essay)
+                count_1000 = sum([c[word] for word in self.words_1000])
+                count_5000 = sum([c[word] for word in self.words_5000])
+                X.loc[i, '1000_words_cnt'] = count_1000
+                X.loc[i, '5000_words_frac'] = count_5000 / float(len(essay))
+
+                # Remove stop words
+                essay = ' '.join([word for word in essay if word not in stop_words])
             else:
                 # If essay is null, set it to empty string
                 essays[i] = ''
 
+        print 'Done preprocessing in the {} step.'.format(fit_or_transform)
         return essays
+
+    def getSATWords(self):
+        with open('../data/SAT_words/1000_words.txt', 'r') as f:
+            self.words_1000 = []
+            for line in f:
+                self.words_1000.append(line.strip())
+
+        with open('../data/SAT_words/5000_words.txt', 'r') as f:
+            self.words_5000 = []
+            for line in f:
+                self.words_5000.append(line.strip())
 
 class FinalColumns(CustomMixin):
     def fit(self, X, y):
@@ -439,8 +466,8 @@ class FinalColumns(CustomMixin):
         final_cols.extend(sports_cols)
         final_cols.extend(essay_cols)
 
-        good_cols = ['Ethnicity_Asian', 'Ethnicity_Black', 'Ethnicity_Hispanic', 'Ethnicity_White', 'HS_Low at first but improved',
-        'HS_Low one semester/year', 'HS_Some good some bad', 'HS_Steady', 'High School GPA', 'Home Country_US', 'Male', 'SAT_times_taken', 'SAT_total_final', 'academic', 'arts', 'award', 'gov', 'leader', 'sportsCaptain', 'sportsVarsity', 'sports_Basketball', 'sports_Cheer/Spirit Squad', 'sports_Fencing', 'sports_Lacrosse', 'sports_Martial Arts', 'sports_Mountain Biking/Cycling', 'sports_Rowing', 'sports_Skiing', 'sports_Soccer', 'sports_Tennis', 'sports_Track &amp; Field', 'sports_Wrestling']
+        good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'race_ecc', 'Home Country_US', 'Ethnicity_Asian', 'Ethnicity_Black', 'Ethnicity_Hispanic', 'Ethnicity_White', 'HS_Steady', 'sports_Tennis', 'sports_Soccer', 'sports_Track &amp; Field', 'sportsVarsity', 'sportsCaptain', '1000_words_cnt', '5000_words_frac']
+        good_cols.extend(essay_cols)
 
         X_model = X[good_cols].copy()
         print 'Finished filtering final columns'
@@ -458,6 +485,8 @@ if __name__=='__main__':
     df = pd.read_csv('../data/train.csv', low_memory=False)
     y = df.pop('top_school_final')
     df_train, df_valid, y_train, y_valid = train_test_split(df, y, train_size=0.7, random_state=123)
+    df_train.reset_index(inplace=True)
+    df_valid.reset_index(inplace=True)
 
     pipeline = Pipeline([
         ('SAT', CleanSAT()),
