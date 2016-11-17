@@ -3,36 +3,45 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.cross_validation import train_test_split
+from sklearn.cross_validation import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler
 import cPickle as pickle
+from datetime import datetime
 
 df = pd.read_csv('../data/train.csv', low_memory=False)
 y = df.pop('top_school_final')
-df_train, df_valid, y_train, y_valid = train_test_split(df, y, train_size=0.7, random_state=123)
-df_train.reset_index(inplace=True)
-df_valid.reset_index(inplace=True)
 
-def go():
-    pipeline = Pipeline([
-        ('SAT', ms.CleanSAT()),
-        ('GPA', ms.CleanGPA()),
-        ('gender', ms.Gender()),
-        ('ethnicity', ms.Ethnicity()),
-        ('extracc', ms.ExtraCurriculars()),
-        ('homecountry', ms.HomeCountry()),
-        ('sports', ms.Sports()),
-        ('dummify', ms.DummifyCategoricals()),
-        ('essay_p1', ms.CleanEssays()),
-        ('essay_p2', ms.AnalyzeEssays()),
-        ('final', ms.FinalColumns()),
-        ('scale', StandardScaler()),
-        ('model', RandomForestClassifier(n_estimators=10, min_samples_leaf=4,min_samples_split=2))
-    ])
+pipeline = Pipeline([
+    ('SAT', ms.CleanSAT()),
+    ('GPA', ms.CleanGPA()),
+    ('gender', ms.Gender()),
+    ('ethnicity', ms.Ethnicity()),
+    ('extracc', ms.ExtraCurriculars()),
+    ('homecountry', ms.HomeCountry()),
+    ('sports', ms.Sports()),
+    ('dummify', ms.DummifyCategoricals()),
+    ('essay_p1', ms.CleanEssays()),
+    ('essay_p2', ms.AnalyzeEssays()),
+    ('final', ms.FinalColumns()),
+    ('scale', StandardScaler()),
+    ('model', RandomForestClassifier())
+])
 
-    model = pipeline.fit(df_train, y_train)
-    y_pred = pipeline.predict(df_valid)
-    ms.showModelResults(y_pred, y_valid)
+params = {
+    'model__min_samples_split': range(2,5),
+    'model__min_weight_fraction_leaf': [0,0.03,0.05],
+    'model__min_samples_leaf': range(1,4)
+}
 
+start = datetime.now()
+gs = GridSearchCV(pipeline, param_grid = params, cv=KFold(len(df),n_folds=5, shuffle=True))
+gs.fit(df, y)
+end = datetime.now()
+print "Finished modeling after {} seconds".format((end-start).seconds)
+print "Best estimator is:"
+print gs.best_estimator_
+
+y_pred = gs.predict(df)
+ms.showModelResults(y_pred, y)
 # with open('../app/data/model.pkl', 'w') as f:
 #     pickle.dump(model, f)

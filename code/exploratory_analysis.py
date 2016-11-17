@@ -137,47 +137,29 @@ def parseSports(df, unique_sports):
                 if sport in raw_data:
                     df.loc[i,'sports_'+sport] = 1
 
-def parseVarsity(x, unique_sports):
+def parseVarsity(x, unique_sports, regexp):
     '''
     Parses through sports text to determine whether someone participated in a varsity sport.
     '''
-    regexp = re.compile('[[]\S+[]]\s[[]\S+[]]\s(.+)')
-    if not x in (None, np.nan):
+    if not x is None and not x is np.nan:
         data = regexp.findall(x)
-        if data[2] == 'Yes':
+        if len(data)>3 and data[2] == 'Yes':
             return 1
         else:
             return 0
-        # for i,d in enumerate(data):
-        #     if d in unique_sports and i+2<len(data):
-        #         if data[i+2] == 'Yes':
-        #             return 1
-        #         else:
-        #             return 0
-        #     else:
-        #         return 0
     else:
         return 0
 
-def parseCaptain(x, unique_sports):
+def parseCaptain(x, unique_sports, regexp):
     '''
     Parses through sports text to determine whether someone was a captain of a sport.
     '''
-    regexp = re.compile('[[]\S+[]]\s[[]\S+[]]\s(.+)')
-    if not x in (None, np.nan):
+    if not x is None and not x is np.nan:
         data = regexp.findall(x)
-        if data[2] == 'Yes':
+        if len(data)>4 and data[3] == 'Yes':
             return 1
         else:
             return 0
-        # for i,d in enumerate(data):
-        #     if d in unique_sports and i+3<len(data):
-        #         if data[i+3] == 'Yes':
-        #             return 1
-        #         else:
-        #             return 0
-        #     else:
-        #         return 0
     else:
         return 0
 

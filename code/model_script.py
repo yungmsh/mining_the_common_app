@@ -17,8 +17,11 @@ import re
 import time
 import string
 import en
+from datetime import datetime
 import cPickle as pickle
 import exploratory_analysis as eda
+
+start = datetime.now()
 
 class CustomMixin(TransformerMixin):
     def get_params(self, **kwargs):
@@ -44,6 +47,9 @@ class CleanSAT(CustomMixin):
         # Give times taken a shorter name
         X['SAT_times_taken'] = X['How many times did you take the official SAT?'].copy()
         self.impute(X)
+
+        lap = datetime.now()
+        print 'Finished SAT after {} seconds.'.format((lap-start).seconds)
         return X
 
     def impute(self, X):
@@ -103,6 +109,9 @@ class CleanGPA(CustomMixin):
         X['High School GPA'] = X['High School GPA'].apply(lambda x: np.nan if x>100 or x<=2 else x)
         X['High School GPA'] = X['High School GPA'].apply(lambda x: self.median if x>4 else x)
         self.impute(X)
+
+        lap = datetime.now()
+        print 'Finished GPA after {} seconds.'.format((lap-start).seconds)
         return X
 
     def impute(self, X):
@@ -117,6 +126,9 @@ class Gender(CustomMixin):
     def transform(self, X):
         X['Male'] = X['Gender'].apply(lambda x: 1 if x=='Male' else 0)
         self.impute(X)
+
+        lap = datetime.now()
+        print 'Finished Gender after {} seconds.'.format((lap-start).seconds)
         return X
 
     def impute(self, X):
@@ -131,6 +143,9 @@ class Ethnicity(CustomMixin):
     def transform(self, X):
         self.extract(X)
         self.impute(X)
+
+        lap = datetime.now()
+        print 'Finished Ethnicity after {} seconds.'.format((lap-start).seconds)
         return X
 
     def impute(self, X):
@@ -168,6 +183,8 @@ class ExtraCurriculars(CustomMixin):
     def transform(self, X):
         for col,lst in zip(self.cols, self.lst_of_keywords):
             X[col] = X['High School Extracurricular Activities'].apply(lambda x: self.extract(x, lst))
+        lap = datetime.now()
+        print 'Finished ECC after {} seconds.'.format((lap-start).seconds)
         return X
 
     def impute(self, X):
@@ -197,14 +214,17 @@ class HomeCountry(CustomMixin):
     def transform(self, X):
         self.extract(X)
         self.impute(X)
+
+        lap = datetime.now()
+        print 'Finished HomeCountry after {} seconds.'.format((lap-start).seconds)
         return X
 
     def impute(self, X):
         X['Home Country_US'].fillna(self.mode)
 
     def extract(self, X):
-        regex = '[[]\S+[]]\s[[]\S+[]]\s(.+)'
-        get_country = lambda x: re.findall(regex, x)[0] if not x is np.nan and not x is None and len(re.findall(regex, x))>0 else x
+        regex = re.compile('[[]\S+[]]\s[[]\S+[]]\s(.+)')
+        get_country = lambda x: regex.findall(x)[0] if not x is np.nan and not x is None and len(regex.findall(x))>0 else x
         X['Home Country'] = X['Home Country'].apply(get_country)
         X['Home Country_US'] = X['Home Country'].apply(lambda x: 1 if x=='United States' else 0)
 
@@ -216,17 +236,19 @@ class Sports(CustomMixin):
 
     def transform(self, X):
         # Initialize dummy variables for each sport category, set to 0s.
-        for sport in self.unique_sports:
-            X['sports_'+sport] = 0
+        # for sport in self.unique_sports:
+        #     X['sports_'+sport] = 0
         # Fill in the dummy variables for each sport category (1 or 0).
         # eda.parseSports(X, self.unique_sports)
-        useful_sports = ['Tennis','Soccer','Track &amp; Field','Fencing','Lacrosse','Rowing','Cheer/Spirit Squad','Basketball']
-        eda.parseSports(X, useful_sports)
-        # Create a varsity dummy variable.
-        X['sportsVarsity'] = X['High School Sports Played'].apply(lambda x: eda.parseVarsity(x, self.unique_sports))
-        # Create a varsity dummy variable.
-        X['sportsCaptain'] = X['High School Sports Played'].apply(lambda x: eda.parseCaptain(x, self.unique_sports))
 
+        regexp = re.compile('[[]\S+[]]\s[[]\S+[]]\s(.+)')
+        # Create a sportsVarsity dummy variable
+        X['sportsVarsity'] = X['High School Sports Played'].apply(lambda x: eda.parseVarsity(x, self.unique_sports, regexp))
+        # Create a sportsCaptain dummy variable.
+        X['sportsCaptain'] = X['High School Sports Played'].apply(lambda x: eda.parseCaptain(x, self.unique_sports, regexp))
+
+        lap = datetime.now()
+        print 'Finished Sports after {} seconds.'.format((lap-start).seconds)
         return X
 
 class DummifyCategoricals(CustomMixin):
@@ -235,6 +257,9 @@ class DummifyCategoricals(CustomMixin):
 
     def transform(self, X):
         X = pd.get_dummies(X, columns=['Academic Performance in High School'], prefix='HS')
+
+        lap = datetime.now()
+        print 'Finished Dummify after {} seconds.'.format((lap-start).seconds)
         return X
 
 class CleanEssays(CustomMixin):
@@ -244,7 +269,10 @@ class CleanEssays(CustomMixin):
     def transform(self, X):
         self.updateEssayCols(X)
         self.updateWordCounts(X)
-        X['essay_c3_edit'] = X['essay_c3'].apply(lambda x: self.cleanEssayC3(x) if not x is np.nan else x)
+        regexp1 = re.compile('Full Length Personal Statement([\s\S]*)')
+        regexp2 = re.compile('[[]\d+[]]')
+        X['essay_c3_edit'] = X['essay_c3'].apply(lambda x: self.cleanEssayC3(x, regexp1, regexp2) if not x is np.nan else x)
+
         for old,new in zip(['essay_c1', 'essay_c2'], ['essay_c1_edit', 'essay_c2_edit']):
             X[new] = X.apply(lambda x: x[old] if x['Undergraduate Personal Statement Type'] == 'Full Length Personal Statement' else np.nan, axis=1)
         self.new_cols = [col+'_edit' for col in self.cols]
@@ -252,6 +280,9 @@ class CleanEssays(CustomMixin):
         self.removeExtremes(X)
         self.removeOverlaps(X)
         X['essay_final'] = X.apply(self.consolidateEssays, axis=1)
+
+        lap = datetime.now()
+        print 'Finished CleanEssays after {} seconds.'.format((lap-start).seconds)
         return X
 
     def updateEssayCols(self, X):
@@ -277,17 +308,17 @@ class CleanEssays(CustomMixin):
         for wordcnt_col, col in zip(self.wordcnt_cols, self.cols):
             X[wordcnt_col] = X[col].apply(lambda x: len(x.split()) if not x is np.nan and not x == None else x)
 
-    def cleanEssayC3(self, essay):
+    def cleanEssayC3(self, essay, regexp1, regexp2):
         '''
         INPUT: essay (string)
         OUTPUT: cleaned essay (string)
 
         Receives an unformatted chunk of text, and extracts just the essay part.
         '''
-        content = re.findall('Full Length Personal Statement([\s\S]*)', essay)
+        content = regexp1.findall(essay)
         if len(content)>0:
             cleaned = content[0].strip()
-            brackets = re.findall('[[]\d+[]]', cleaned)
+            brackets = regexp2.findall(cleaned)
             if len(brackets)>0:
                 pos = cleaned.find(brackets[0])
                 return cleaned[:pos].strip()
@@ -301,15 +332,15 @@ class CleanEssays(CustomMixin):
 
         Given a dataframe and list of essay cols, this function removes ASCII characters in each entry in each col.
         '''
+        regexp = re.compile('[^\w\s\d,.-]+')
         for col in self.cols:
-            X[col] = X[col].apply(lambda x: self._ASCII(x) if not x is np.nan and not x is None else x)
+            X[col] = X[col].apply(lambda x: self._ASCII(x, regexp) if not x is np.nan and not x is None else x)
 
-    def _ASCII(self, essay):
+    def _ASCII(self, essay, regexp):
         '''
         Internal function for removeASCII function above
         '''
-        # for exp in set(re.findall('\xe2\W*', essay)):
-        for exp in set(re.findall('[^\w\s\d,.-]+', essay)):
+        for exp in set(regexp.findall(essay)):
             essay = essay.replace(exp, '')
         return essay
 
@@ -354,25 +385,23 @@ class AnalyzeEssays(CustomMixin):
         self.getSATWords()
         # Preprocess: remove stopwords and perform stemming
         essays = self.preprocess(X, 'fit')
-        print 'Finished preprocessing essays'
 
         # Vectorize using tfidf
         self.vec = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=2, max_features=10000)
         self.vec.fit(essays)
         mat = self.vec.transform(essays)
-        print 'Finished vectorizing (fit and transform) on fit step'
+        print 'Finished TFIDF vectorizing on fit step'
 
         # Use NMF to perform topic modeling
         self.nmf = NMF(n_components=7, random_state=123)
         self.nmf.fit(mat)
         mat_nmf = self.nmf.transform(mat)
-        print 'Finished NMF fit_transform on fit step'
+        print 'Finished NMF on fit step'
         self.essay_topics = ['essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
 
         # Calculate 'avg' values of topics (to impute missing essays later)
         self.avg_topics = df_nmf.mean().values
-        print 'self.avg_topics is', self.avg_topics
 
         # Calculate mean of SAT word cols
         self.words_1000_mean = X['1000_words_cnt'].mean()
@@ -397,6 +426,8 @@ class AnalyzeEssays(CustomMixin):
         X['5000_words_frac'].fillna(value=self.words_5000_mean, inplace=True)
 
         print 'Finished imputing essay features (topics AND fraction of SAT words)'
+        lap = datetime.now()
+        print 'Finished Analyze Essays after {} seconds.'.format((lap-start).seconds)
         return X
 
     def preprocess(self, X, fit_or_transform):
@@ -453,12 +484,11 @@ class FinalColumns(CustomMixin):
         return self
 
     def transform(self, X):
-        final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US']
+        final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US', '5000_words_frac']
 
         ethnicity_cols = [col for col in X.columns if col.find('Ethnicity_')>-1]
         HS_perf_cols = [col for col in X.columns if col.find('HS_')>-1]
-        sports_cols = [col for col in X.columns if col.find('sports_')>-1]
-        sports_cols.extend(['sportsVarsity', 'sportsCaptain'])
+        sports_cols = ['sportsVarsity', 'sportsCaptain']
         essay_cols = ['essay_topic'+str(i) for i in range(1,8)]
 
         final_cols.extend(ethnicity_cols)
@@ -466,13 +496,14 @@ class FinalColumns(CustomMixin):
         final_cols.extend(sports_cols)
         final_cols.extend(essay_cols)
 
-        good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'race_ecc', 'Home Country_US', 'Ethnicity_Asian', 'Ethnicity_Black', 'Ethnicity_Hispanic', 'Ethnicity_White', 'HS_Steady', 'sports_Tennis', 'sports_Soccer', 'sports_Track &amp; Field', 'sportsVarsity', 'sportsCaptain', '1000_words_cnt', '5000_words_frac']
+        good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', '5000_words_frac']
         good_cols.extend(essay_cols)
 
         X_model = X[good_cols].copy()
-        print 'Finished filtering final columns'
-        print 'Printing the number of nulls in each col'
         print X_model.isnull().sum()
+
+        lap = datetime.now()
+        print 'Finished FinalColumns after {} seconds.'.format((lap-start).seconds)
         return X_model
 
 def showModelResults(y_pred, y_test):
