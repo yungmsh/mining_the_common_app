@@ -283,6 +283,11 @@ class CleanEssays(CustomMixin):
 
         lap = datetime.now()
         print 'Finished CleanEssays after {} seconds.'.format((lap-start).seconds)
+
+        # final_cols = ['Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', 'SAT_total_final', 'SAT_times_taken', 'High School GPA']
+        # print "Nulls in each column:"
+        # print X[final_cols].isnull().sum()
+
         return X
 
     def updateEssayCols(self, X):
@@ -413,7 +418,8 @@ class AnalyzeEssays(CustomMixin):
         essays = self.preprocess(X, 'transform')
         mat = self.vec.transform(essays)
         mat_nmf = self.nmf.transform(mat)
-
+        print len(X)
+        print len(mat_nmf)
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
         X = X.join(df_nmf)
 
@@ -428,23 +434,33 @@ class AnalyzeEssays(CustomMixin):
         print 'Finished imputing essay features (topics AND fraction of SAT words)'
         lap = datetime.now()
         print 'Finished Analyze Essays after {} seconds.'.format((lap-start).seconds)
+
+        # final_cols = ['Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', '5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
+        # print "Nulls in each column:"
+        # print X[final_cols].isnull().sum()
         return X
 
     def preprocess(self, X, fit_or_transform):
         # If fitting, just use non-null values
-        if fit_or_transform == 'fit':
-            essays = X[X['essay_final'].notnull()]['essay_final'].values
-        # If transforming, use all values
-        elif fit_or_transform == 'transform':
-            essays = X['essay_final'].values
+        # if fit_or_transform == 'fit':
+        #     essays = X[X['essay_final'].notnull()]['essay_final'].values
+        # # If transforming, use all values
+        # elif fit_or_transform == 'transform':
+        essays = X['essay_final'].values
 
         punct = string.punctuation
         stop_words = stopwords.words('english')
         wn = WordNetLemmatizer()
 
         for i,essay in enumerate(essays):
-            if not essay in (np.nan, None, ''):
-                essay = essay.decode('utf8')
+            if not essay in (np.nan, None):
+                try:
+                    essay = essay.encode('ascii','ignore')
+                except:
+                    try:
+                        essay = essay.decode('ascii','ignore')
+                    except:
+                        pass
                 # Correct tense and lemmatize
                 essay = essay.split()
                 for i,word in enumerate(essay):
@@ -457,10 +473,14 @@ class AnalyzeEssays(CustomMixin):
                 count_1000 = sum([c[word] for word in self.words_1000])
                 count_5000 = sum([c[word] for word in self.words_5000])
                 X.loc[i, '1000_words_cnt'] = count_1000
-                X.loc[i, '5000_words_frac'] = count_5000 / float(len(essay))
+                if len(essay)==0:
+                    X.loc[i,'5000_words_frac'] = 0
+                else:
+                    X.loc[i, '5000_words_frac'] = count_5000 / float(len(essay))
 
                 # Remove stop words
                 essay = ' '.join([word for word in essay if word not in stop_words])
+                essays[i] = essay
             else:
                 # If essay is null, set it to empty string
                 essays[i] = ''
@@ -484,20 +504,20 @@ class FinalColumns(CustomMixin):
         return self
 
     def transform(self, X):
-        final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US', '5000_words_frac']
+        # final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US', '5000_words_frac']
+        #
+        # ethnicity_cols = [col for col in X.columns if col.find('Ethnicity_')>-1]
+        # HS_perf_cols = [col for col in X.columns if col.find('HS_')>-1]
+        # sports_cols = ['sportsVarsity', 'sportsCaptain']
+        # essay_cols = ['essay_topic'+str(i) for i in range(1,8)]
 
-        ethnicity_cols = [col for col in X.columns if col.find('Ethnicity_')>-1]
-        HS_perf_cols = [col for col in X.columns if col.find('HS_')>-1]
-        sports_cols = ['sportsVarsity', 'sportsCaptain']
-        essay_cols = ['essay_topic'+str(i) for i in range(1,8)]
+        # final_cols.extend(ethnicity_cols)
+        # final_cols.extend(HS_perf_cols)
+        # final_cols.extend(sports_cols)
+        # final_cols.extend(essay_cols)
 
-        final_cols.extend(ethnicity_cols)
-        final_cols.extend(HS_perf_cols)
-        final_cols.extend(sports_cols)
-        final_cols.extend(essay_cols)
-
-        good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', '5000_words_frac']
-        good_cols.extend(essay_cols)
+        good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady']
+        # good_cols.extend(essay_cols)
 
         X_model = X[good_cols].copy()
         print X_model.isnull().sum()
@@ -505,6 +525,26 @@ class FinalColumns(CustomMixin):
         lap = datetime.now()
         print 'Finished FinalColumns after {} seconds.'.format((lap-start).seconds)
         return X_model
+
+class FinalColumnsCat(CustomMixin):
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X):
+        final_cols = ['Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', 'SAT_total_final', 'SAT_times_taken', 'High School GPA']
+        # '5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7'
+        print X[final_cols].isnull().sum()
+        return X[final_cols]
+
+class FinalColumnsNonCat(CustomMixin):
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X):
+        # print final_cols
+        # print X[final_cols].isnull().sum()
+
+        return X[final_cols]
 
 def showModelResults(y_pred, y_test):
     print 'Accuracy:', accuracy_score(y_pred, y_test)
