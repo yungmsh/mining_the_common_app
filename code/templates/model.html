@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %} {{ title }} {% endblock %}
+
+{% block navbar %}
+<nav class='navbar navbar-default'>
+	<div class='navbar-header'>
+		<a class='navbar-brand' href='#'>AdmitSee Analytics</a>
+	</div>
+
+	<div class='collapse navbar-collapse'>
+		<ul class='nav navbar-nav'>
+			<li><a href='{{ url_for('index') }}'>Home</a></li>
+			<li><a href='{{ url_for('analyzer') }}'>Essay</a></li>
+			<li class='active'><a href='{{ url_for('model') }}'>Admissions</a></li>
+		</ul>
+	</div>
+</nav>
+{% endblock %}
+
+{% block content %}
+	<h2>Admissions</h2>
+	<p>Enter your profile:</p>
+
+	<form action='/model_results' method='POST'>
+		<p>Gender (check 1 only)</p>
+			<label><input type="checkbox" name="male" value=1> Male </label>
+			<label><input type="checkbox" name="female" value=1> Female </label>
+		<br>
+		<p>Ethnicity (check 1 or more)</p>
+			<label><input type="checkbox" name="asian" value=1> Asian </label>
+			<label><input type="checkbox" name="black" value=1> African-American </label>
+			<label><input type="checkbox" name="hispanic" value=1> Hispanic </label>
+			<label><input type="checkbox" name="white" value=1> Caucasian </label>
+			<label><input type="checkbox" name="pacific" value=1> Pacific Islander </label>
+			<label><input type="checkbox" name="nativeam" value=1> Native American </label>
+		<br>
+		<p>Academics</p>
+			<input type='text' name='gpa' placeholder='GPA' />
+			<input type='text' name='sat' placeholder='SAT' />
+			<input type='text' name='sat_times_taken' placeholder='Times taken the SAT' />
+		<br>
+		<p>Extra-Curriculars</p>
+			<input type='text' name='ecc' placeholder='Enter all your extracurriculars in this box' size=100 />
+		<br>
+		<p>Common App Essay</p>
+			<input type='text' name='essay' placeholder='Type/paste your essay' size=100 />
+		<br><br>
+		<button class='btn btn-primary' type='submit'>Submit</button>
+	</form>
+{% endblock %}

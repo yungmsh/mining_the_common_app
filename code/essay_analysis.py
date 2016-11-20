@@ -322,6 +322,26 @@ class TopicModeling(object):
 
         return zip(similar_idx, similar_essays)
 
+    def getBestSentence(self, essay, vec, nmf):
+        # Essay level
+        nmf_e = nmf.transform(vec.transform([essay]))
+        # Sentence level
+        sentences = re.findall("[^.!?\n]+", essay)
+        tfidf_s = []
+        for sentence in sentences:
+            tfidf_s.append(vec.transform([sentence]))
+        nmf_s = []
+        for sentence in tfidf_s:
+            nmf_s.append(nmf.transform(sentence))
+
+        # Calculate distances
+        distances = []
+        for sentence in nmf_s:
+            distances.append(euclidean(sentence, nmf_e))
+
+        top_idx = np.array(distances).argsort()[:5]
+        return top_idx
+
 class ClusterTools(object):
     def __init__(self):
         pass

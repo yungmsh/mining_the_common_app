@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %} {{ title }} {% endblock %}
+
+{% block navbar %}
+<nav class='navbar navbar-default'>
+	<div class='navbar-header'>
+		<a class='navbar-brand' href='#'>AdmitSee Analytics</a>
+	</div>
+
+	<div class='collapse navbar-collapse'>
+		<ul class='nav navbar-nav'>
+			<li><a href='{{ url_for('index') }}'>Home</a></li>
+			<li><a href='{{ url_for('analyzer') }}'>Essay</a></li>
+			<li class='active'><a href='{{ url_for('model') }}'>Admissions</a></li>
+		</ul>
+	</div>
+</nav>
+{% endblock %}
+
+{% block content %}
+    <h2>Admissions</h2>
+    <p>Your profile has been analyzed:</p>
+		<ul>
+			<li>You have a {{prediction}}% probability of getting into a top school.</li>
+		</ul> <br>
+		<p>{{sat_times_taken}}</p>
+
+{% endblock %}

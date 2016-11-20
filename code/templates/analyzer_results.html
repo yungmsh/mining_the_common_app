@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %} {{ title }} {% endblock %}
+
+{% block navbar %}
+<nav class='navbar navbar-default'>
+	<div class='navbar-header'>
+		<a class='navbar-brand' href='#'>AdmitSee Analytics</a>
+	</div>
+
+	<div class='collapse navbar-collapse'>
+		<ul class='nav navbar-nav'>
+			<li><a href='{{ url_for('index') }}'>Home</a></li>
+			<li class='active'><a href='{{ url_for('analyzer') }}'>Essay</a></li>
+			<li><a href='{{ url_for('model') }}'>Admissions</a></li>
+		</ul>
+	</div>
+</nav>
+{% endblock %}
+
+{% block content %}
+    <h2>Essay Analytics</h2>
+		<h4>Analysis</h4>
+    	<p>Your essay has been analyzed:</p>
+				<ul>
+					{% for topic,value in topic_tuples %}
+						{% if value > 0 %}
+							<p> {{ value }}% {{ topic }} </p>
+						{% endif %}
+					{% endfor %}
+				</ul>
+			<h5>Your Essay</h5>
+				<p>
+				{% for i,sentence in sentences %}
+					{% if i in top_idx %} <b> {% endif %}
+						{{ sentence }}
+					{% if i in top_idx %} </b> {% endif %}
+					{% if i in linebreak_idx %} <br/> {% endif %}
+				{% endfor %}
+			</p>
+		<h4>Similar Essays</h4>
+			<p>Your essay is most similar to the following essays:</p>
+		<h5>Essay 1</h5>
+			<p>{{essay1}}</p>
+			<p>--------------------</p>
+		<h5>Essay 2</h5>
+			<p>{{essay2}}</p>
+			<p>--------------------</p>
+		<h5>Essay 3</h5>
+			<p>{{essay3}}</p>
+
+{% endblock %}

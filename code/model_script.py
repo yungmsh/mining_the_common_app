@@ -284,10 +284,6 @@ class CleanEssays(CustomMixin):
         lap = datetime.now()
         print 'Finished CleanEssays after {} seconds.'.format((lap-start).seconds)
 
-        # final_cols = ['Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', 'SAT_total_final', 'SAT_times_taken', 'High School GPA']
-        # print "Nulls in each column:"
-        # print X[final_cols].isnull().sum()
-
         return X
 
     def updateEssayCols(self, X):
@@ -431,13 +427,10 @@ class AnalyzeEssays(CustomMixin):
         X['1000_words_cnt'].fillna(value=self.words_1000_mean, inplace=True)
         X['5000_words_frac'].fillna(value=self.words_5000_mean, inplace=True)
 
-        print 'Finished imputing essay features (topics AND fraction of SAT words)'
         lap = datetime.now()
         print 'Finished Analyze Essays after {} seconds.'.format((lap-start).seconds)
 
-        # final_cols = ['Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', '5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
-        # print "Nulls in each column:"
-        # print X[final_cols].isnull().sum()
+        print X.columns
         return X
 
     def preprocess(self, X, fit_or_transform):
@@ -517,7 +510,6 @@ class FinalColumns(CustomMixin):
         # final_cols.extend(essay_cols)
 
         good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady']
-        # good_cols.extend(essay_cols)
 
         X_model = X[good_cols].copy()
         print X_model.isnull().sum()
@@ -526,23 +518,12 @@ class FinalColumns(CustomMixin):
         print 'Finished FinalColumns after {} seconds.'.format((lap-start).seconds)
         return X_model
 
-class FinalColumnsCat(CustomMixin):
+class FinalEssayColumns(CustomMixin):
     def fit(self, X, y):
         return self
 
     def transform(self, X):
-        final_cols = ['Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady', 'SAT_total_final', 'SAT_times_taken', 'High School GPA']
-        # '5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7'
-        print X[final_cols].isnull().sum()
-        return X[final_cols]
-
-class FinalColumnsNonCat(CustomMixin):
-    def fit(self, X, y):
-        return self
-
-    def transform(self, X):
-        # print final_cols
-        # print X[final_cols].isnull().sum()
+        final_cols = ['5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
 
         return X[final_cols]
 
@@ -551,6 +532,7 @@ def showModelResults(y_pred, y_test):
     print 'Precision:', precision_score(y_pred, y_test)
     print 'Recall:', recall_score(y_pred, y_test)
     print 'Confusion Matrix: ', confusion_matrix(y_pred, y_test)
+
 
 if __name__=='__main__':
     df = pd.read_csv('../data/train.csv', low_memory=False)
