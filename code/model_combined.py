@@ -9,6 +9,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold, cross_val_score
 from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix
 import cPickle as pickle
 from datetime import datetime
 
@@ -32,7 +33,6 @@ def mainPipeline(model):
         ('model', model)
     ])
     return p
-
 
 class DualPipeline(object):
     def __init__(self):
@@ -93,7 +93,8 @@ class EssayPipeline(object):
 
     def findEssayIdx(self, X):
         '''
-        Helper function to identify essay indices as an initial step in both fitting and predicting. The idea is we're modeling a subset of the full dataset (where there are 'good' essay entries) so we only want to choose the appropriate indices.
+        Helper function to identify essay indices as an initial step in both fitting and predicting.
+        The idea is we're modeling a subset of the full dataset, so we only want to choose the appropriate indices.
         '''
         self.clean = me.CleanEssays()
         self.clean.cleanEverything(X)

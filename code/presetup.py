@@ -100,6 +100,20 @@ class Schools(object):
             else:
                 return 0
 
+    def extractAllFromAttended(self, x, school):
+        '''
+        INPUT: x (string or np.nan), school (string)
+        OUTPUT: binary int
+
+        This function takes in some string/nan input and returns 1 if its user attended the school, 0 if not.
+        '''
+        if not x is np.nan:
+            schools = re.findall('[[]\S+[]]\s[[]\S+[]]\s(.+)', x)
+            if school in schools:
+                return 1
+            else:
+                return 0
+
     def finalTopSchool(self, x):
         '''
         INPUT: x (string or np.nan)
