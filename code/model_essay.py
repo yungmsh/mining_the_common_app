@@ -11,7 +11,7 @@ import string
 import en
 
 class CleanEssays(object):
-    def getEssayIndices(self, X):
+    def cleanEverything(self, X):
         self.updateEssayCols(X)
         self.updateWordCounts(X)
         regexp1 = re.compile('Full Length Personal Statement([\s\S]*)')
@@ -26,12 +26,8 @@ class CleanEssays(object):
         self.removeOverlaps(X)
         X['essay_final'] = X.apply(self.consolidateEssays, axis=1)
 
-        # lap = datetime.now()
-        # print 'Finished CleanEssays after {} seconds.'.format((lap-start).seconds)
-        idx = X[X['essay_final'].notnull()].index
-        return (idx, X)
-
-        # return X
+        self.essay_idx = X[X['essay_final'].notnull()].index
+        return X
 
     def updateEssayCols(self, X):
         '''
@@ -156,12 +152,9 @@ class AnalyzeEssays(object):
         self.words_5000_mean = X['5000_words_frac'].mean()
 
     def transform(self, X):
-        print len(X)
         essays = self.preprocess(X, 'transform')
-        print len(essays)
         mat = self.vec.transform(essays)
         mat_nmf = self.nmf.transform(mat)
-        print len(X)
         df_nmf = pd.DataFrame(mat_nmf, columns = self.essay_topics)
         X = X.join(df_nmf)
 
@@ -173,7 +166,6 @@ class AnalyzeEssays(object):
         X['1000_words_cnt'].fillna(value=self.words_1000_mean, inplace=True)
         X['5000_words_frac'].fillna(value=self.words_5000_mean, inplace=True)
 
-        print X.columns
         return X
 
     def preprocess(self, X, fit_or_transform):
