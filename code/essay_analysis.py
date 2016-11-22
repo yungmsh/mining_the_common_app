@@ -361,6 +361,7 @@ class ClusterTools(object):
             self.silhouette_scores_.append((score,k))
         self.best_score_ = sorted(self.silhouette_scores_, reverse=True)[0]
         print 'The best K is {}, with a silhouette score of {}.'.format(self.best_score_[1], self.best_score_[0])
+        print self.silhouette_scores_
 
     def topClusterWords(self, vec, mat, k=3, words=10):
         '''
