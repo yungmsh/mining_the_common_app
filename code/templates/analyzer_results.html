@@ -19,7 +19,6 @@
 
 {% block content %}
     <h2>Essay Analytics</h2>
-		<h4>Analysis</h4>
     	<p>Your essay has been analyzed:</p>
 				<ul>
 					{% for topic,value in topic_tuples %}
@@ -36,6 +35,9 @@
 					{% if i in top_idx %} </b> {% endif %}
 				{% endfor %}
 			</p>
+
+		<!-- <iframe srcdoc="{{interactive_plot}}" width="1000px" height="700px"> </iframe> -->
+
 		<h4>Similar Essays</h4>
 			<p>Your essay is most similar to the following essays:</p>
 		<h5>Essay 1</h5>

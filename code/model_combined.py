@@ -1,4 +1,4 @@
-import model_main as mm
+import model_nonessay as mne
 import model_essay as me
 import pandas as pd
 import numpy as np
@@ -9,7 +9,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold, cross_val_score
 from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix
 import cPickle as pickle
 from datetime import datetime
 
@@ -20,25 +19,26 @@ def refreshData():
 
 def mainPipeline(model):
     p = Pipeline([
-        ('SAT', mm.CleanSAT()),
-        ('GPA', mm.CleanGPA()),
-        ('gender', mm.Gender()),
-        ('ethnicity', mm.Ethnicity()),
-        ('extracc', mm.ExtraCurriculars()),
-        ('homecountry', mm.HomeCountry()),
-        ('sports', mm.Sports()),
-        ('dummify', mm.DummifyCategoricals()),
-        ('finalcols', mm.FinalColumns()),
-        ('scale', StandardScaler()),
+        ('SAT', mne.CleanSAT()),
+        ('GPA', mne.CleanGPA()),
+        ('gender', mne.Gender()),
+        ('ethnicity', mne.Ethnicity()),
+        ('extracc', mne.ExtraCurriculars()),
+        ('homecountry', mne.HomeCountry()),
+        ('sports', mne.Sports()),
+        ('dummify', mne.DummifyCategoricals()),
+        ('finalcols', mne.FinalColumns()),
+        # ('scale', StandardScaler()),
         ('model', model)
     ])
     return p
+
 
 class DualPipeline(object):
     def __init__(self):
         pass
 
-    def fit(self, X, y, p1, p2, params1, params2):
+    def fit(self, X, y, p1, p2, params1, params2, scoring):
         '''
         INPUT: X (Pandas dataframe), y (np.array), p1 (sklearn Pipeline), p2 (sklearn Pipeline), params1 (dict), params2 (dict)
         OUTPUT: None
@@ -47,12 +47,12 @@ class DualPipeline(object):
         '''
         # Pipeline 1
         # df,y = refreshData()
-        self.gs1 = GridSearchCV(p1, param_grid = params1, cv=KFold(len(X),n_folds=2, shuffle=True))
+        self.gs1 = GridSearchCV(p1, param_grid = params1, cv=KFold(len(X),n_folds=2, shuffle=True), scoring=scoring)
         self.gs1.fit(X, y)
 
         # Pipeline 2
         # df,y = refreshData()
-        self.gs2 = GridSearchCV(p2, param_grid = params2, cv=KFold(len(X),n_folds=2, shuffle=True))
+        self.gs2 = GridSearchCV(p2, param_grid = params2, cv=KFold(len(X),n_folds=2, shuffle=True), scoring=scoring)
         self.gs2.fit(X, y)
 
     def predict(self, X, method='avg', model=None, proba=True):
@@ -94,28 +94,28 @@ class EssayPipeline(object):
     def findEssayIdx(self, X):
         '''
         Helper function to identify essay indices as an initial step in both fitting and predicting.
-        The idea is we're modeling a subset of the full dataset, so we only want to choose the appropriate indices.
+        The idea is we're modeling a subset of the full dataset so we only want to choose the appropriate indices.
         '''
         self.clean = me.CleanEssays()
         self.clean.cleanEverything(X)
         self.essay_idx = self.clean.essay_idx
 
-    def fit(self, X, y, model):
+    def fit(self, X, y, model, params, scoring):
         self.findEssayIdx(X)
         X = X.loc[self.essay_idx,:].copy()
         y = y[self.essay_idx].copy()
         self.analyze.fit(X)
         X = self.analyze.transform(X)
         self.essay_cols = ['5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
-        self.model = model
-        self.model.fit(X.loc[:,self.essay_cols], y)
+        self.gs = GridSearchCV(self.model, params, cv=3, scoring=scoring)
+        self.gs.fit(X.loc[:,self.essay_cols], y)
 
     def predict(self, X):
         self.findEssayIdx(X)
         X = X.loc[self.essay_idx,:]
         X = self.analyze.transform(X)
         print X.columns
-        y_proba = self.model.predict_proba(X.loc[:,self.essay_cols])[:,1]
+        y_proba = self.gs.predict_proba(X.loc[:,self.essay_cols])[:,1]
         return y_proba
 
 def combinePredictions(y_proba_main, y_proba_essay, essay_idx):
@@ -139,17 +139,17 @@ class GrandModel(object):
     def __init__(self):
         pass
 
-    def fit(self, X, y, model1, model2, params1, params2, essay_model):
+    def fit(self, X, y, model1, model2, params1, params2, essay_model, essay_params, scoring):
         # DualPipeline
         p1 = mainPipeline(model1)
         p2 = mainPipeline(model2)
         self.dp = DualPipeline()
-        self.dp.fit(X, y, p1, p2, params1, params2)
+        self.dp.fit(X, y, p1, p2, params1, params2, scoring)
 
         # EssayPipeline
         self.ep = EssayPipeline()
         # df,y = refreshData()
-        self.ep.fit(X, y, essay_model)
+        self.ep.fit(X, y, essay_model, essay_params, scoring)
 
     def predict(self, X):
         y_proba_main = self.dp.predict(X)
@@ -179,47 +179,34 @@ class GrandModel(object):
         metrics = [accuracy_score, precision_score, recall_score, confusion_matrix]
         for text,score in zip(metric_text, metrics):
             print '{}: {}'.format(text, score(y, y_pred))
-        # print 'Accuracy:', accuracy_score(y_pred, y_true)
-        # print 'Precision:', precision_score(y_pred, y_true)
-        # print 'Recall:', recall_score(y_pred, y_true)
-        # print 'Confusion Matrix: ', confusion_matrix(y_pred, y_true)
 
-# ORIGINAL FUNCTION BELOW
-# def runModel(model1, model2, params1, params2, essay_model):
-#     # DualPipeline fit and predict
-#     p1 = mainPipeline(model1)
-#     p2 = mainPipeline(model2)
-#     dp = DualPipeline()
-#     dp.fit(p1, p2, params1, params2)
-#     y_proba_main = dp.predict(df)
-#
-#     # EssayPipeline fit and predict
-#     ep = EssayPipeline()
-#     df,y = refreshData()
-#     ep.fit(df, y, essay_model)
-#     y_proba_essay = ep.predict(df)
-#
-#     # Combine predictions
-#     y_pred = combinePredictions(y_proba_main, y_proba_essay, essay_idx)
-#     return y_pred
+def showLogisticCoefs(features, coefs):
+    for coef,feature in sorted(zip(np.exp(subset_coef), subset_cols), reverse=True):
+        print feature, np.round(coef,4)
 
 if __name__ == '__main__':
     df,y = refreshData()
 
     p1 = LogisticRegression()
     p2 = RandomForestClassifier()
+    essay_model = RandomForestClassifier()
+
     params1 = {
-        'model__C': np.logspace(-2,4,2)
+        'model__C': np.logspace(-2,4,4)
     }
     params2 = {
-        'model__min_samples_split': range(2,3),
-        # 'model__min_weight_fraction_leaf': [0,0.03,0.05],
-        # 'model__min_samples_leaf': range(1,4)
+        'model__min_samples_split': range(2,5),
+        'model__min_weight_fraction_leaf': [0,0.03],
+        'model__min_samples_leaf': range(1,4)
     }
-    essay_model = KNeighborsClassifier()
+    essay_params = {
+        'model__min_samples_split': range(2,4),
+        'model__min_weight_fraction_leaf': [0,0.03],
+        'model__min_samples_leaf': range(1,3)
+    }
 
     gm = GrandModel()
-    gm.fit(df, y, p1, p2, params1, params2, essay_model)
+    gm.fit(df, y, p1, p2, params1, params2, essay_model, scoring='precision')
     y_pred = gm.predict(df)
     print gm.showModelResults(y, y_pred)
 
@@ -229,3 +216,5 @@ if __name__ == '__main__':
     # THE VERY LAST THING TO DO (new script?)
     # df_test = pd.read_csv('../data/test.csv', low_memory=False)
     # y_test = df_test.pop('top_school_final')
+    # y_pred = gm.predict(df_test)
+    # print gm.showModelResults(y_test, y_pred)

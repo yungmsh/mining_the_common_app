@@ -8,6 +8,8 @@ import re
 from summa import textrank
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 import essay_analysis as ea
+import visualize as v
+import seaborn as sns
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -18,8 +20,8 @@ with open('../data/app/tfidf_mat.pkl') as f:
     tfidf_mat = pickle.load(f)
 with open('../data/app/nmf.pkl') as f:
     nmf = pickle.load(f)
-with open('../data/app/model.pkl') as f:
-    my_model = pickle.load(f)
+# with open('../data/app/model.pkl') as f:
+#     my_model = pickle.load(f)
 
 # home page
 @app.route('/')
@@ -107,34 +109,44 @@ def analyzer_results():
     for i,sentence in enumerate(sentences):
         if sentence in top_sentences:
             top_idx.append(i)
+    # Retokenize to get punctuation marks back
+    sentences = s_tokenizer.tokenize(essay)
     sentences = list(enumerate(sentences))
 
-    topics,similar_essays = process_essay(essay, similarity_nmf, similarity_tfidf, json_output=False)
-    essay1 = similar_essays[0][1]
-    essay2 = similar_essays[1][1]
-    essay3 = similar_essays[2][1]
+    topics,similar_essays = processEssay(essay, similarity_nmf, similarity_tfidf, json_output=False)
+    essay1 = similar_essays[0]
+    essay2 = similar_essays[1]
+    essay3 = similar_essays[2]
     topic1, topic2, topic3, topic4, topic5, topic6, topic7 = topics
     topic_names = ['Family', 'Music', 'Culture', 'Sport', 'Personal/Story', 'Science', 'Career']
     topic_tuples = zip(topic_names, topics)
 
-    return render_template('analyzer_results.html', essay1 = essay1, essay2 = essay2, essay3 = essay3, topic_tuples = topic_tuples, sentences=sentences, top_idx=top_idx)
+    # Load interactive plot
+    interactive_plot = interactivePlot()
+
+    return render_template('analyzer_results.html', essay1 = essay1, essay2 = essay2, essay3 = essay3, topic_tuples = topic_tuples, sentences=sentences, top_idx=top_idx, interactive_plot=interactive_plot)
 
 @app.route('/analyzer/api/v1.0/similar_essays', methods = ['GET', 'POST'])
 def json_results():
     essay = request.form.get('essay')
     similarity_nmf = request.form.get('similarity_nmf')
     similarity_tfidf = request.form.get('similarity_tfidf')
-    similar_essays = process_essay(essay, similarity_nmf, similarity_tfidf, json_output=True)
+    similar_essays = processEssay(essay, similarity_nmf, similarity_tfidf, json_output=True)
 
     json_output = [{'id':userid, 'essay':content} for userid,content in similar_essays]
 
     return jsonify({'similar_essays':json_output})
 
+@app.route('/interactive_plot', methods = ['GET', 'POST'])
+def interactive_plot():
+    # Load interactive plot
+    interactive_plot = interactivePlot()
+    return interactive_plot
 
 ####################
 ## Helper functions
 
-def process_essay(essay, similarity_nmf, similarity_tfidf, json_output):
+def processEssay(essay, similarity_nmf, similarity_tfidf, json_output):
     '''
     This method actually analyzes the essay and outputs a tuple of 3 values:
     1) list of indices for the most 'representative' sentences
@@ -158,8 +170,10 @@ def process_essay(essay, similarity_nmf, similarity_tfidf, json_output):
     # Load in database of essays and topics
     df_essay = pd.read_csv('../data/app/essays_and_topics.csv')
     essays = df_essay['content'].values
-    essays_idx = df_essay['id'].values
-    topic_mat = df_essay.ix[:,3:].values
+    essays_id = df_essay['id'].values
+    essays_dict = {essay:i for essay,i in zip(essays, essays_id)}
+    topic_names = ['family', 'music', 'culture', 'sport', 'personal', 'science', 'career']
+    topic_mat = df_essay.loc[:,topic_names].values
 
     # Get essays based on NMF euclidean distance or TFIDF cosine similarity
     tm = ea.TopicModeling()
@@ -175,9 +189,24 @@ def process_essay(essay, similarity_nmf, similarity_tfidf, json_output):
     # top_idx = tm.getBestSentence(essay, vectorizer, nmf)
 
     if json_output:
-        return similar_essays
+        similar_ids = [essays_dict[essay] for essay in similar_essays]
+        return zip(similar_ids, similar_essays)
     else:
         return (topics,similar_essays)
+
+def interactivePlot():
+    # Load in database of essays and topics
+    df_essay = pd.read_csv('../data/app/essays_and_topics.csv')
+    topics = ['Personal/Story', 'Culture', 'Family', 'Music', 'Career', 'Science', 'Sport']
+    summaries = df_essay['summary'].values
+    pca1 = df_essay['pca1'].values
+    pca2 = df_essay['pca2'].values
+    labels = df_essay['topic_cluster_num']
+    cluster_names = {i:topic for i,topic in enumerate(topics)}
+
+    html = v.plotEssays(pca1, pca2, labels, summaries, cluster_names, ms=5, output='app')
+
+    return html
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=True)

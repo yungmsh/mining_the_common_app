@@ -163,7 +163,7 @@ class AnalyzeEssays(object):
         self.stop_words = stopwords.words('english')
         self.stemmer = PorterStemmer()
 
-    def stopWordsAndStem(self, essays):
+    def stopWordsAndStem(self, essays, returns=False):
         for i,essay in enumerate(essays):
             if not essay is np.nan and not essay is None:
                 essay = re.sub('\xe2\W+', '', essay)
@@ -175,6 +175,9 @@ class AnalyzeEssays(object):
                     except UnicodeDecodeError:
                         pass
                 essays[i] = ' '.join(stemmed)
+
+        if returns:
+            return essays
 
     def removeASCII(self, essay):
         '''
@@ -282,10 +285,12 @@ class TopicModeling(object):
 
     def similarEssaysNMF(self, essay, essays, topic_mat, vectorizer, dim_red_model, n=3):
         '''
-        Returns a list of tuples of the most similar essays based on Euclidean distance of NMF scores.
-
-        Tuple: (id, essay)
+        Returns a list of n most similar essays based on Euclidean distance of NMF scores.
         '''
+        # Do some pre-cleaning: stem and stop words
+        ae = AnalyzeEssays()
+        essay = ae.stopWordsAndStem([essay], returns=True)[0]
+
         # Perform Tfidf-Vectorization and NMF
         mat = vectorizer.transform([essay])
         mat_nmf = dim_red_model.transform(mat)
@@ -299,14 +304,16 @@ class TopicModeling(object):
         similar_essays = essays[similar_idx]
         similar_essays = map(lambda x: unicode(x, 'utf-8'), similar_essays)
 
-        return zip(similar_idx, similar_essays)
+        return similar_essays
 
     def similarEssaysTfidf(self, essay, essays, sparse_mat, vectorizer, n=3):
         '''
-        Returns a list of tuples of n most similar essays based on Cosine distance of tfidf scores.
-
-        Tuple: (id, essay)
+        Returns a list of n most similar essays based on Cosine distance of tfidf scores.
         '''
+        # Do some pre-cleaning: stem and stop words
+        ae = AnalyzeEssays()
+        essay = ae.stopWordsAndStem([essay], returns=True)[0]
+
         # Perform Tfidf-Vectorization
         tfidf = vectorizer.transform([essay])
         tfidf = tfidf.toarray()
@@ -316,11 +323,12 @@ class TopicModeling(object):
         for row in sparse_mat:
             distances.append(cosine(row.toarray(), tfidf))
 
-        similar_idx = np.array(distances).argsort()[1:n+1]
+        similar_idx = (np.array(distances).argsort())[1:n+1]
         similar_essays = essays[similar_idx]
-        similar_essays = map(lambda x: unicode(x, 'utf-8'), similar_essays)
+        # similar_essays = map(lambda x: unicode(x, 'utf-8'), similar_essays)
 
-        return zip(similar_idx, similar_essays)
+        # return distances
+        return similar_essays
 
     def getBestSentence(self, essay, vec, nmf):
         # Essay level
@@ -342,6 +350,22 @@ class TopicModeling(object):
         top_idx = np.array(distances).argsort()[:5]
         return top_idx
 
+    def printAcceptanceByTopic(self, df, topics, low_thresh=0.01, mid_thresh=0.33):
+        for i,topic in enumerate(topics):
+            print topic.upper()
+            no_topic = df[df[topic]<low_thresh]['top_school_final']
+            low_topic = df[(df[topic]>low_thresh)&(df[topic]<=mid_thresh)]['top_school_final']
+            high_topic = df[df[topic]>mid_thresh]['top_school_final']
+
+            print 'Least "{}"-oriented essays have an acceptance rate of {}% ({} entries)'.format(
+                topic, np.round((no_topic.mean()*100),1), sum(no_topic))
+            print 'Less "{}"-oriented essays have an acceptance rate of {}% ({} entries)'.format(
+                topic, np.round((low_topic.mean()*100),1), sum(low_topic))
+            print 'More "{}"-oriented essays have an acceptance rate of {}% ({} entries)'.format(
+                topic, np.round((high_topic.mean()*100),1), sum(high_topic))
+            print '\n'
+
+
 class ClusterTools(object):
     def __init__(self):
         pass
@@ -361,7 +385,6 @@ class ClusterTools(object):
             self.silhouette_scores_.append((score,k))
         self.best_score_ = sorted(self.silhouette_scores_, reverse=True)[0]
         print 'The best K is {}, with a silhouette score of {}.'.format(self.best_score_[1], self.best_score_[0])
-        print self.silhouette_scores_
 
     def topClusterWords(self, vec, mat, k=3, words=10):
         '''
