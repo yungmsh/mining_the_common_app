@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold, cross_val_score
+from sklearn.metrics import accuracy_score, precision_score, confusion_matrix, recall_score
 from sklearn.grid_search import GridSearchCV
 from sklearn.preprocessing import StandardScaler
 import cPickle as pickle
@@ -47,12 +48,12 @@ class DualPipeline(object):
         '''
         # Pipeline 1
         # df,y = refreshData()
-        self.gs1 = GridSearchCV(p1, param_grid = params1, cv=KFold(len(X),n_folds=2, shuffle=True), scoring=scoring)
+        self.gs1 = GridSearchCV(p1, param_grid = params1, cv=5, scoring=scoring)
         self.gs1.fit(X, y)
 
         # Pipeline 2
         # df,y = refreshData()
-        self.gs2 = GridSearchCV(p2, param_grid = params2, cv=KFold(len(X),n_folds=2, shuffle=True), scoring=scoring)
+        self.gs2 = GridSearchCV(p2, param_grid = params2, cv=5, scoring=scoring)
         self.gs2.fit(X, y)
 
     def predict(self, X, method='avg', model=None, proba=True):
@@ -107,7 +108,7 @@ class EssayPipeline(object):
         self.analyze.fit(X)
         X = self.analyze.transform(X)
         self.essay_cols = ['5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
-        self.gs = GridSearchCV(self.model, params, cv=3, scoring=scoring)
+        self.gs = GridSearchCV(model, params, cv=3, scoring=scoring)
         self.gs.fit(X.loc[:,self.essay_cols], y)
 
     def predict(self, X):
@@ -117,23 +118,6 @@ class EssayPipeline(object):
         print X.columns
         y_proba = self.gs.predict_proba(X.loc[:,self.essay_cols])[:,1]
         return y_proba
-
-def combinePredictions(y_proba_main, y_proba_essay, essay_idx):
-    '''
-    INPUT: y_proba_main (list of probabilities), y_proba_essay (list of probabilities), essay_idx (list of indices)
-    OUTPUT: y_final (list of predictions)
-
-    Combines the predictions from the non-essay model with the essay model.
-
-    Notes:
-    len(y_essay) = len(essay_idx)
-    len(y_main) = len(y_final)
-    '''
-    y_proba_final = y_proba_main.copy()
-    for i,j in enumerate(np.array(essay_idx)):
-        y_proba_final[j] = np.mean((y_proba_main[j], y_proba_essay[i]))
-    y_final = np.round(y_proba_final)
-    return y_final
 
 class GrandModel(object):
     def __init__(self):
@@ -181,7 +165,7 @@ class GrandModel(object):
             print '{}: {}'.format(text, score(y, y_pred))
 
 def showLogisticCoefs(features, coefs):
-    for coef,feature in sorted(zip(np.exp(subset_coef), subset_cols), reverse=True):
+    for coef,feature in sorted(zip(np.exp(coefs), features), reverse=True):
         print feature, np.round(coef,4)
 
 if __name__ == '__main__':
@@ -192,21 +176,22 @@ if __name__ == '__main__':
     essay_model = RandomForestClassifier()
 
     params1 = {
-        'model__C': np.logspace(-2,4,4)
+        'model__C': np.logspace(3,6,6)
     }
     params2 = {
-        'model__min_samples_split': range(2,5),
+        'model__min_samples_split': range(2,3),
         'model__min_weight_fraction_leaf': [0,0.03],
-        'model__min_samples_leaf': range(1,4)
+        'model__min_samples_leaf': range(1,2)
     }
     essay_params = {
-        'model__min_samples_split': range(2,4),
-        'model__min_weight_fraction_leaf': [0,0.03],
-        'model__min_samples_leaf': range(1,3)
+        # 'model__min_samples_split': range(2,3),
+        # 'model__min_weight_fraction_leaf': [0,0.03],
+        # 'model__min_samples_leaf': range(1,2)
+        'n_estimators': [10,20]
     }
 
     gm = GrandModel()
-    gm.fit(df, y, p1, p2, params1, params2, essay_model, scoring='precision')
+    gm.fit(df, y, p1, p2, params1, params2, essay_model, essay_params, scoring='precision')
     y_pred = gm.predict(df)
     print gm.showModelResults(y, y_pred)
 

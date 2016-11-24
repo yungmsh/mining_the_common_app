@@ -325,7 +325,7 @@ class TopicModeling(object):
 
         similar_idx = (np.array(distances).argsort())[1:n+1]
         similar_essays = essays[similar_idx]
-        # similar_essays = map(lambda x: unicode(x, 'utf-8'), similar_essays)
+        similar_essays = map(lambda x: unicode(x, 'utf-8'), similar_essays)
 
         # return distances
         return similar_essays

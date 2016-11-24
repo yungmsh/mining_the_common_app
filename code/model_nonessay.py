@@ -271,8 +271,11 @@ class FinalColumns(CustomMixin):
         sports_cols = ['sportsVarsity', 'sportsCaptain']
 
         final_cols.extend(ethnicity_cols)
+        final_cols.remove('Ethnicity_White') # Only need n-1 dummy vars
         final_cols.extend(HS_perf_cols)
+        final_cols.remove('HS_Steady') # Only need n-1 dummy vars
         final_cols.extend(sports_cols)
+        final_cols.remove('High School GPA') # Due to multi-collinearity w/ SAT
 
         good_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'award', 'academic', 'gov', 'sportsVarsity', 'sportsCaptain', 'Ethnicity_Black', 'Ethnicity_White', 'HS_Steady']
 
