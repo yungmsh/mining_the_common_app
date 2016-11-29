@@ -273,7 +273,7 @@ class FinalColumns(CustomMixin):
         final_cols.extend(ethnicity_cols)
         final_cols.remove('Ethnicity_White') # Only need n-1 dummy vars
         final_cols.extend(HS_perf_cols)
-        final_cols.remove('HS_Steady') # Only need n-1 dummy vars
+        #final_cols.remove('HS_Steady') # Only need n-1 dummy vars
         final_cols.extend(sports_cols)
         final_cols.remove('High School GPA') # Due to multi-collinearity w/ SAT
 
@@ -285,3 +285,32 @@ class FinalColumns(CustomMixin):
         lap = datetime.now()
         print 'Finished FinalColumns after {} seconds.'.format((lap-start).seconds)
         return X_model
+
+class FinalColumnsWithEssay(CustomMixin):
+    def fit(self, X, y):
+        return self
+
+    def transform(self, X):
+        final_cols = ['SAT_total_final', 'SAT_times_taken', 'High School GPA', 'Male', 'leader', 'arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US']
+
+        ethnicity_cols = [col for col in X.columns if col.find('Ethnicity_')>-1]
+        HS_perf_cols = [col for col in X.columns if col.find('HS_')>-1]
+        sports_cols = ['sportsVarsity', 'sportsCaptain']
+        essay_cols = ['5000_words_frac', 'essay_topic1', 'essay_topic2', 'essay_topic3', 'essay_topic4', 'essay_topic5', 'essay_topic6', 'essay_topic7']
+
+        final_cols.extend(ethnicity_cols)
+        final_cols.remove('Ethnicity_White') # Only need n-1 dummy vars
+        final_cols.extend(HS_perf_cols)
+        final_cols.remove('HS_Steady') # Only need n-1 dummy vars
+        final_cols.extend(sports_cols)
+        final_cols.remove('High School GPA') # Due to multi-collinearity w/ SAT
+        final_cols.extend(essay_cols)
+
+        X_model = X[final_cols].copy()
+
+        lap = datetime.now()
+        print 'Finished FinalColumnsWithEssay after {} seconds.'.format((lap-start).seconds)
+        return X_model
+
+
+final_cols = ['SAT_total_final','SAT_times_taken', 'male', 'leader','arts', 'award', 'community', 'academic', 'gov', 'diversity', 'race_ecc', 'Home Country_US', 'Ethnicity_Asian', 'Ethnicity_Black', 'Ethnicity_Hispanic', 'Ethnicity_Pacific', 'Ethnicity_NativeAm', 'HS_High at first but got worse', 'HS_Low at first but improved', 'HS_Low one semester/year', 'HS_Some good some bad','sportsVarsity', 'sportsCaptain']

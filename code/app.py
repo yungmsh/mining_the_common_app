@@ -202,9 +202,10 @@ def interactivePlot():
     pca1 = df_essay['pca1'].values
     pca2 = df_essay['pca2'].values
     labels = df_essay['topic_cluster_num']
+    titles = df_essay['topic_cluster_text']
     cluster_names = {i:topic for i,topic in enumerate(topics)}
 
-    html = v.plotEssays(pca1, pca2, labels, summaries, cluster_names, ms=5, output='app')
+    html = v.plotEssays(pca1, pca2, labels, titles, cluster_names, ms=5, output='app')
 
     return html
 
