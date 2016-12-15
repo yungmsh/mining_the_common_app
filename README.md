@@ -15,7 +15,7 @@ After doing a train-test split on my dataset, I had about 12k students to work w
 
 ### Building an Ensemble Model
 Here is a simplified visual representation of how I built my ensemble model.
-![alt tag](https://raw.githubusercontent.com/yungmsh/capstone_project/blob/master/imgs/model_pipeline.png)
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/model_pipeline.png)
 Starting with a set of about 50 raw fields, I feature-engineered a handful of potentially useful predictors, such as varsity sport involvement, winning an award, taking on a leadership position, etc. On the essay side, I employed NLP techniques to find the topic distribution of each essay (I’ll go into more depth about how this was done in the subsequent post). Additionally, I created a variable called word_sophistication, a proxy of how many ‘fancy’ words a student used in his/her essay (measured as total occurrence of sophisticated words / total word count). One might hypothesize that both extremes are negatively correlated with admissions outcomes: a value of zero might indicate a lack of wordsmanship, while a high value could point to a loquacious writer exorbitantly flamboyant in his lexical verbiage (excuse the irony). If so, the optimum must exist somewhere along this spectrum — we then let the beauty of machine learning take over to find this point/range.
 
 
