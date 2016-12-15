@@ -4,9 +4,10 @@
 The industry built around college admissions is a pretty saturated one — from private ‘elite’ tutors in Asia, to global test-prep powerhouses like Kaplan, and even to TaskRabbit-esque marketplaces for ‘essay consultation services’ (read: latent plagiarism). Yet it seems tutors, teachers, and consultants alike have yet to crack the code on admissions. Does a magic formula even exist? Probably not, but there are likely decision rules within admissions committees we don’t know much about, and there are most certainly underlying relationships across acceptances and denials that we can learn from.
 
 For my final capstone project at Galvanize, I had the fortune of working with AdmitSee, an online college application resource where prospective students can browse the profiles and essays of real admitted students. With this unique data, I set out to answer two key questions:
-
+<i>
 1. Can we create a better predictive model than the existing probability-calculators for college admissions?
 2. What insights can we glean from the Common App essay, both on an individual and an aggregate level?
+</i>
 
 ## Part 1: The Model
 
@@ -15,18 +16,18 @@ After doing a train-test split on my dataset, I had about 12k students to work w
 
 ### Building an Ensemble Model
 Here is a simplified visual representation of how I built my ensemble model.
-![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/model_pipeline.png)
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/model_pipeline.png) <br>
 Starting with a set of about 50 raw fields, I feature-engineered a handful of potentially useful predictors, such as varsity sport involvement, winning an award, taking on a leadership position, etc. On the essay side, I employed NLP techniques to find the topic distribution of each essay (I’ll go into more depth about how this was done in the subsequent post). Additionally, I created a variable called word_sophistication, a proxy of how many ‘fancy’ words a student used in his/her essay (measured as total occurrence of sophisticated words / total word count). One might hypothesize that both extremes are negatively correlated with admissions outcomes: a value of zero might indicate a lack of wordsmanship, while a high value could point to a loquacious writer exorbitantly flamboyant in his lexical verbiage (excuse the irony). If so, the optimum must exist somewhere along this spectrum — we then let the beauty of machine learning take over to find this point/range.
 
 
 ### Evaluating the Model(s)
-To evaluate the model, I spoke with the folks at AdmitSee and we agreed that precision would be the most fitting metric to evaluate a model’s success here. Models that prioritize precision tend to be more conservative in their probability estimates, which aligns quite well with AdmitSee’s goal of encouraging students to use their product even though they might be ‘star students’ to begin with.
+To evaluate the model, I spoke with the folks at AdmitSee and we agreed that precision would be the most fitting metric to evaluate a model’s success here. Models that prioritize precision tend to be more conservative in their probability estimates, which aligns quite well with AdmitSee’s goal of encouraging students to use their product even though they might be ‘star students’ to begin with. <br>
 <br>
 A Receiver Operating Characteristic (ROC) curve illustrates the performance of a model as we vary the threshold at which we discriminate two classes. Basically, the goal is to maximize the area under the curve. In the graph below, we compare the performance of four models: i) Logistic Regression, ii) Random Forest, iii) a basic Ensemble Model [LR+RF], iv) a Grand Ensemble that builds on the basic Ensemble and combines it with a new model that incorporates essay features. Ignoring LR, while the area under the curves look visually indiscernible, the Grand Ensemble takes the cake, with a precision of 62.8 (compared to Ensemble’s 61.9 and RF’s 57.7).
-![alt tag](https://raw.githubusercontent.com/yungmsh/capstone_project/blob/master/imgs/roc_curve.png)
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/roc_curve.png)
 
 ### Interpreting the Model
-Optimizing for precision is great, but what if we wanted to know how each variable affects your admissions chances? This is where Logistic Regression shines. In spite of its weaker performance, it is highly interpretable. More specifically, we can take the exponent of the coefficients to understand the marginal effect of each feature on the outcome variable.
+Optimizing for precision is great, but what if we wanted to know how each variable affects your admissions chances? This is where Logistic Regression shines. In spite of its weaker performance, it is highly interpretable. More specifically, we can take the exponent of the coefficients to understand the marginal effect of each feature on the outcome variable. <br>
 <br>
 Since I’m bound by an NDA, I can’t really disclose the details, but I can give a quick example. The coefficient for the binary variable leader is 0.82. Taking the exponent of that gives us 2.26. What that means is, if you aren’t already in a leadership position, taking one will more than double your odds of being admitted!
 
@@ -44,19 +45,30 @@ Next, we want to represent each essay as a numerical vector, so that we can make
 ### Topic Modeling (using NMF)
 After vectorizing the essays, our matrix takes the form of the square grey box on the left in the graphic below (note: in reality it is not square-shaped at all — in our case the number of words far exceed the number of essays).
 
-<!-- ![alt tag](https://cdn-images-1.medium.com/max/800/1*kZy81Ogwt-A17ZfodN9CQg.png) -->
-![alt tag](https://raw.githubusercontent.com/yungmsh/capstone_project/tree/master/imgs/nmf_explained.png)
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/nmf_explained.png) <br>
 
 It’s great that we’ve represented the essay as vectors, but in reality the matrix is highly sparse (i.e. mostly filled with zeros) so it’s still a little difficult to make meaningful calculations. Enter dimensionality reduction. The idea is to reduce the number of dimensions by some order so that we can more easily perform operations on the data. On the plus side, it helps reduce overfitting, lowers computational costs, and prevents the ‘curse of dimensionality’. On the flip side, we forgo some information as we are essentially ‘throwing out’ columns of data. There are many techniques to do this — in this case, I chose to use non-negative matrix factorization (NMF). The basic premise of NMF is to deconstruct your original matrix into two separate matrices: a ‘long’ one and a ‘fat’ one. When you multiply the two together, you get a reconstructed matrix that is approximately equal to your original matrix. It’s called ‘non-negative’ because we don’t allow any negative values, giving the benefit of interpretability especially in the context of text analysis and ratings/reviews data (e.g. Netflix, Yelp). In our case, the ‘long’ one is our new dimensionality-reduced matrix, and the ‘fat’ one is a reference guide that contains semantic information (see below).
+
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/semantic_guide.png)
 
 ### Essay Topic Distribution
 Why was all that important? Well, I built a tool for AdmitSee where you can upload your essay, and it will tell you the topic distribution of your essay, according to the seven topics the NMF algorithm learned. In addition, it also shows you the three most ‘similar’ essays to your essay. How is similarity calculated? You can choose from two options: Euclidean distance of the topic distribution, or Cosine similarity of the TF-IDF essay vector.
 
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/topic_distribution.png)
+
+### The Landscape of College Essays
+So we just took a deep dive into essays on the individual level, but what if we wanted to learn about the broader trends across colleges/universities? To do this, I first calculated the mean topic distribution for each school, resulting in a topic vs. school matrix. Then, I used PCA to reduce the dimensionality from 7 topics to 2 features, so that we could visualize the data in 2-D. Finally, I used k-means to cluster the schools in groups that can be heuristically supported. The result is as follows:
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/landscape_1.png) <br>
+
+As one would expect, the liberal arts schools (e.g. Bowdoin, Middlebury, Wellesley, etc.) are clustered to the far left and slightly nudged under the horizontal axis. Schools with a STEM focus (e.g. CMU, MIT, CalTech) are clustered up top, trivially with the highest representation of science-related essays. Perhaps the most interesting insight I want to part you with, is that all the Ivy League schools are concentrated in the middle. This suggests that the top schools don’t look for one thing in particular, and reaffirms the general claim that they do seek for a diversified pool of student interests.
+
+![alt tag](https://github.com/yungmsh/capstone_project/blob/master/imgs/landscape_2.png) <br>
+
 ---
 
 ## Final Thoughts & Caveats
-As exciting and rewarding as this project was, there is always room for improvement. In our modeling phase, we implicitly assumed that these top schools apply the same criteria to vetting applicants every year, whereas in the reality, they probably update (even if slightly) what they look for in students as time passes. For next steps, I would focus on performing some more feature-engineering by looking at interaction effects (e.g. Varsity * Captain), and by exploring deeper effects intertwined across variables (e.g. a Hispanic student holding a leadership position in an Asian Student Society).
+As exciting and rewarding as this project was, there is always room for improvement. In our modeling phase, we implicitly assumed that these top schools apply the same criteria to vetting applicants every year, whereas in the reality, they probably update (even if slightly) what they look for in students as time passes. For next steps, I would focus on performing some more feature-engineering by looking at interaction effects (e.g. Varsity * Captain), and by exploring deeper effects intertwined across variables (e.g. a Hispanic student holding a leadership position in an Asian Student Society). <br>
 <br>
-To take this project to the next level, I would also explore using Latent Dirichlet Allocation (LDA) for the topic modeling portion. LDA is a generative statistical model that assumes every essay has an underlying distribution of topics, and every topic has an underlying distribution of words. Recent literature has suggested that this probabilistic approach can yield better results, so it would be a natural next step to explore.
+To take this project to the next level, I would also explore using Latent Dirichlet Allocation (LDA) for the topic modeling portion. LDA is a generative statistical model that assumes every essay has an underlying distribution of topics, and every topic has an underlying distribution of words. Recent literature has suggested that this probabilistic approach can yield better results, so it would be a natural next step to explore. <br>
 <br>
 As AdmitSee continues to grow and collect more data, it would be interesting to see how the visualization of schools above differs between undergraduate and graduate essays, and to also look at trends over time (e.g. have certain schools shifted from more career-driven to more personality-driven essays?)
