@@ -4,10 +4,9 @@
 The industry built around college admissions is a pretty saturated one — from private ‘elite’ tutors in Asia, to global test-prep powerhouses like Kaplan, and even to TaskRabbit-esque marketplaces for ‘essay consultation services’ (read: latent plagiarism). Yet it seems tutors, teachers, and consultants alike have yet to crack the code on admissions. Does a magic formula even exist? Probably not, but there are likely decision rules within admissions committees we don’t know much about, and there are most certainly underlying relationships across acceptances and denials that we can learn from.
 
 For my final capstone project at Galvanize, I had the fortune of working with AdmitSee, an online college application resource where prospective students can browse the profiles and essays of real admitted students. With this unique data, I set out to answer two key questions:
-<i>
-1. Can we create a better predictive model than the existing probability-calculators for college admissions?
-2. What insights can we glean from the Common App essay, both on an individual and an aggregate level?
-</i>
+
+1. <i>Can we create a better predictive model than the existing probability-calculators for college admissions? </i>
+2. <i>What insights can we glean from the Common App essay, both on an individual and an aggregate level?</i>
 
 ## Part 1: The Model
 
